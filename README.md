@@ -19,7 +19,7 @@ GitHub Actions for safely shipping AI agents — CI release gate for prompts, sk
 
 Airlock treats models, prompts, tools, skills, MCP servers, judges, and eval sets as a **releasable unit**, detects what changed, evaluates behavior against policy with **statistical confidence**, and **blocks or approves** the ship — including when the change came from upstream.
 
-The open-source distribution is a local-first Go toolchain (binary + CI Action + `.airlock/` store). Prove that gate in CI first; the hosted control plane comes later (open-core).
+You run a local CLI and a GitHub Action. State stays under `.airlock/` in your app repo. Nothing uploads by default.
 
 > First public beta · no telemetry · [Apache-2.0](LICENSE) · state under `.airlock/` · versions in [CHANGELOG](CHANGELOG.md)
 
@@ -62,10 +62,10 @@ State lives under **`.airlock/`** in your **application** repo. Nothing uploads 
 | Good fit | Weak fit today |
 |----------|----------------|
 | LLM apps / agents with prompts, tools, skills, or MCP | Pure CRUD with no model/prompt/tool surface |
-| Teams that change prompts or models often and want PR gates | Expecting a hosted org dashboard today (Phase 5+) |
+| Teams that change prompts or models often and want PR gates | Need a hosted team dashboard |
 | Repos with eval cases / Promptfoo, or OTel GenAI spans | Need full SDK AST for every framework *now* |
 
-**Not yet:** hosted control plane (Phase 5), enterprise SSO / EU / K8s (Phase 6), release agent (Phase 7). See [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
+This repo is the CLI, the Action, and the local store. There is no hosted dashboard. What is planned next lives on the [roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
 
 ---
 
@@ -193,7 +193,7 @@ exit 1   # merge blocked until: airlock approve --base … --head …
 
 A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
 
-That is the company wedge: **AI change control on the PR**, not “hope the prompt looks fine.”
+The job is **AI change control on the PR**, not hoping the prompt looks fine.
 
 `--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[Developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/)**.
 
@@ -201,7 +201,7 @@ That is the company wedge: **AI change control on the PR**, not “hope the prom
 
 1. In your **application** repo: `airlock init` → commit `.airlock/policy.yml` (and keep snapshots as you prefer).
 2. Copy [`.github/workflows/airlock.yml`](.github/workflows/airlock.yml) into that repo (not into this one).
-3. Company default: fail closed with `--fail-on-approval` / `--fail-on-eval` (sample workflow defaults `AIRLOCK_FAIL_ON_APPROVAL=true`).
+3. Fail closed with `--fail-on-approval` / `--fail-on-eval` (sample workflow defaults `AIRLOCK_FAIL_ON_APPROVAL=true`).
 
 ### Security in CI
 
@@ -258,9 +258,6 @@ A full **AI release stack**, not a single command:
 | **Stack scanner** | OpenAI SDK + LangGraph heuristics; live MCP schema fetch for HTTP servers |
 | **Eval flexibility** | Artifact→suite bindings, experiment compare, eval promote, LangSmith/Braintrust import |
 | **Lockfile deps** | `go.sum` / `package-lock.json` / `Cargo.lock` → supply-chain blast radius |
-| **Control plane** *(Phase 5)* | Team: shared history, approvals, audit, environments, Slack/Teams, regression analytics |
-| **Platform** *(Phase 6)* | Enterprise: SSO/RBAC, EU / self-host, K8s admission, publish gate beside SCA |
-| **Release agent** *(Phase 7)* | After gate trusted: investigate regressions, recommend rollback, open PRs |
 
 ```mermaid
 flowchart TB
@@ -307,7 +304,7 @@ Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Air
 |---------|------------|
 | `init` / `snapshot` / `diff` | Manifest discovery, release snapshots, blast-radius diff |
 | `test` / `ci` | Statistical evals + PR release decision |
-| `ci --fail-on-eval` / `--fail-on-inconclusive` / `--fail-on-approval` | Fail closed (company default) |
+| `ci --fail-on-eval` / `--fail-on-inconclusive` / `--fail-on-approval` | Fail closed |
 | `import promptfoo\|langsmith\|braintrust` | Bring existing eval corpora |
 | `eval promote --from ingest\|results` | Promote failed runs → eval cases |
 | `ingest otel` / `baseline create` / `drift` | Production loop |
@@ -320,23 +317,9 @@ Gates fire only when a confidence interval **excludes** the threshold. Cassettes
 
 ---
 
-## Status & roadmap
+## Status
 
-| Phase | Status | Scope |
-|-------|--------|--------|
-| **0–4** | **Done (OSS beta)** | Release gate: manifest → diff → eval → policy → CI Action (+ Sentinel, stack scan, eval flexibility) |
-| **Next** | Proof | 10–20 teams with Action on real agent PRs - harden gate, don’t rush SaaS |
-| **5** | Later | Team control plane (open-core paid) |
-| **6** | Later | Enterprise platform (SSO, EU, admission, publish gate) |
-| **7** | Later | Release agent (investigate / rollback / PR) - only after gate trusted |
-
-```text
-OSS release gate (now)  →  prove in CI  →  Phase 5 team plane  →  Phase 6 enterprise  →  Phase 7 release agent
-```
-
-**Details:** [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/) - thesis, open-core, integration maps, explicit non-goals (incl. “not code test selection”).
-
-Design-partner outreach continues (process, not a phase). Release notes: [CHANGELOG.md](CHANGELOG.md).
+Public beta: snapshot, diff, eval, policy, and the CI Action. Release notes: [CHANGELOG.md](CHANGELOG.md). What might come later: [roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
 
 ## Development
 
@@ -349,13 +332,9 @@ This repository’s CI is [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](https://xdlc-labs.github.io/documentation/airlock/guide/) · [Roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/)
 
+## Related
 
-
-## In this org
-
-- [xdlc-agent](https://github.com/xdlc-labs/xdlc-agent) — self-hosted CI Fix daemon
-- [documentation](https://xdlc-labs.github.io/documentation/) — hosted guides
-- [example-service](https://github.com/xdlc-labs/example-service) — xdlc-agent battleground
+Failed GitHub Actions, and you want a Fix from the coding agent you already run? See [xdlc-agent](https://github.com/xdlc-labs/xdlc-agent).
 
 ## License
 
