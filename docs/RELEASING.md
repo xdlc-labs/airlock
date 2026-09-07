@@ -23,8 +23,9 @@ git tag -a vX.Y.Z -m "vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-5. Watch **Release** workflow (`.github/workflows/release.yml`). It builds linux/darwin × amd64/arm64, attaches tarballs + sha256, creates the GitHub Release (pre-release if the tag contains `beta` / `rc` / `alpha`).
-6. Smoke:
+5. Watch **Release** workflow (`.github/workflows/release.yml`). It builds linux/darwin × amd64/arm64, attaches tarballs + sha256, creates the GitHub Release (pre-release if the tag contains `beta` / `rc` / `alpha`). The workflow cannot list the Action on GitHub Marketplace.
+6. Marketplace (org owner, 2FA, browser only). Edit the new release. Accept the GitHub Marketplace Developer Agreement if the checkbox is disabled. Tick **Publish this Action to the GitHub Marketplace**. Primary category: Continuous integration. Optional second: Code quality. Click **Update release**. Listing URL is derived from `action.yml` `name` (spaces become hyphens). `uses:` stays `xdlc-labs/airlock@<tag>`. Do not set `name:` to `Airlock`. That login is taken by [github.com/airlock](https://github.com/airlock), and GitHub refuses the listing.
+7. Smoke:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=vX.Y.Z bash

@@ -13,6 +13,13 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 
 ### Fixed
 
+## [0.1.0-beta.10] – 2026-09-07
+
+Marketplace display name is `Airlock AI gate`. Pin `uses: xdlc-labs/airlock@v0.1.0-beta.10`.
+
+### Changed
+- `action.yml` `name` is `Airlock AI gate`. GitHub rejects Marketplace names that match an existing user or org, and [github.com/airlock](https://github.com/airlock) already exists.
+
 ## [0.1.0-beta.9] – 2026-09-07
 
 GitHub Marketplace listing for the reusable Action. Pin `uses: xdlc-labs/airlock@v0.1.0-beta.9`.
@@ -153,7 +160,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.9...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.10...HEAD
+[0.1.0-beta.10]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.9...v0.1.0-beta.10
 [0.1.0-beta.9]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.8...v0.1.0-beta.9
 [0.1.0-beta.8]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.7...v0.1.0-beta.8
 [0.1.0-beta.7]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.6...v0.1.0-beta.7
