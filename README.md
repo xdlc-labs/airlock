@@ -251,7 +251,7 @@ Keep the observability + eval platform. Airlock is the **release gate beside it*
 
 1. Keep tracing and datasets in LangSmith (or similar).
 2. In the **application** repo: `airlock init`, point evals at cases you already trust (Promptfoo YAML, or export dataset → Airlock eval JSONL / `airlock import promptfoo`).
-3. Tune `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@<tag>` after checkout (`fail-on-eval` / `fail-on-approval` inputs).
+3. Tune `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@<tag>` after checkout.
 4. Optional: feed production signal via `airlock ingest otel` → `baseline` / `drift` (OTel JSONL; not a live LangSmith API sync yet).
 
 **Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#langsmith--braintrust--langfuse--phoenix).

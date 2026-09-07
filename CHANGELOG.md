@@ -10,13 +10,13 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 Reusable GitHub Action so an app repo does not copy a 100-line workflow. Tag as `v0.1.0-beta.7` after CI on this change is green.
 
 ### Added
-- Root `action.yml`: `uses: xdlc-labs/airlock@<tag>` after checkout. Builds the CLI from the action ref, snapshots merge-base vs HEAD, posts the PR comment. Inputs: `fail-on-approval` (default true), `fail-on-eval`, `fail-on-ai-change`, `fail-on-inconclusive`.
+- Root `action.yml`: checkout, then `uses: xdlc-labs/airlock@<tag>`. Builds the CLI, diffs merge-base vs HEAD, comments on the PR, fail-closed on approval.
 - `airlock ci --fail-on-inconclusive`: `--fail-on-eval` alone only ever tripped CI on `FAIL`, so default thresholds (`0.99`/`0.995` min) against the default `max_samples_per_case: 5` could sit at `INCONCLUSIVE` indefinitely with nothing failing the build. The new flag fails closed on `INCONCLUSIVE` too (and still fails on `FAIL` when enabled alone).
 - Comparative eval gates (`task_success` regression, `adversarial_critical`) now show a `SKIPPED` row with reason when no baseline result exists to compare against, instead of silently vanishing from the report with zero trace. `SKIPPED` never fails closed on its own.
 - Skill hashing now covers the whole skill directory (`manifest.HashDirTree`), not just `SKILL.md` — a sibling script/resource changing without touching `SKILL.md` used to go undetected; it now registers as a skill change.
 
 ### Changed
-- This repo’s workflow is `uses: ./`. App repos pin a release tag. No more copy-paste of the snapshot script.
+- This repo’s workflow is `uses: ./`. App repos pin a release tag.
 
 ### Fixed
 
