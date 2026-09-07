@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="https://xdlc-labs.github.io/documentation/images/brand/mark.png" width="72" alt="xdlc-labs">
+</p>
+
+<p align="center">
   <strong>Airlock</strong>
 </p>
 
