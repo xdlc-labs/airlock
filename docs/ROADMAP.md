@@ -2,4 +2,4 @@
 
 Moved to the org docs site:
 
-**https://xdlc-labs.github.io/documentation/airlock/roadmap/**
+**https://xdlc.dev/airlock/docs/roadmap/**

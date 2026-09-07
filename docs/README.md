@@ -1,8 +1,8 @@
 # Docs
 
-Guides: **[xdlc-labs.github.io/documentation](https://xdlc-labs.github.io/documentation/airlock/guide/)**.
+Guides: **[xdlc.dev/airlock/docs](https://xdlc.dev/airlock/docs)**.
 
-- [Developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/)
-- [Roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/)
+- [Developer guide](https://xdlc.dev/airlock/docs)
+- [Roadmap](https://xdlc.dev/airlock/docs/roadmap)
 
 How we cut a release stays in this repo: [RELEASING.md](RELEASING.md).

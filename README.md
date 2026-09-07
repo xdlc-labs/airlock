@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://xdlc-labs.github.io/documentation/images/brand/mark.png" width="72" alt="xdlc-labs">
+  <img src="https://xdlc.dev/images/brand/mark.png" width="72" alt="xdlc-labs">
 </p>
 
 <p align="center">
@@ -45,7 +45,7 @@ And its mirror: **did a change we never made just get released to us?**
 
 ## How it works
 
-Same flow as the [developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/#how-a-change-is-gated):
+Same flow as the [developer guide](https://xdlc.dev/airlock/docs#how-a-change-is-gated):
 
 ```text
 edit prompt / skill / model / MCP / tools
@@ -69,7 +69,7 @@ State lives under **`.airlock/`** in your **application** repo. Nothing uploads 
 | Teams that change prompts or models often and want PR gates | Need a hosted team dashboard |
 | Repos with eval cases / Promptfoo, or OTel GenAI spans | Need full SDK AST for every framework *now* |
 
-This repo is the CLI, the Action, and the local store. There is no hosted dashboard. What is planned next lives on the [roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
+This repo is the CLI, the Action, and the local store. There is no hosted dashboard. What is planned next lives on the [roadmap](https://xdlc.dev/airlock/docs/roadmap).
 
 ---
 
@@ -259,11 +259,11 @@ error: airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --b
 exit 1
 ```
 
-A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
+A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
 
 The job is **AI change control on the PR**, not hoping the prompt looks fine.
 
-`--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[Developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/)**.
+`--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[Developer guide](https://xdlc.dev/airlock/docs)**.
 
 ## Use it on your repo
 
@@ -300,7 +300,7 @@ Airlock gates **AI release risk** on the PR - not general AppSec:
 
 Skill / MCP power expansion → `NEEDS_APPROVAL`. Approvals are advisory until CI uses `--fail-on-approval`.
 
-**Supply chain (npm, crates.io, PyPI, …):** classic malware-in-the-lockfile is still Dependabot / SCA / provenance. Agents make it worse by proposing or merging deps at machine speed. Airlock’s angle is the **AI release surface**: when a prompt/skill/MCP/agent change also expands an APM-tracked package dependency, that lands in blast radius as `NEEDS_APPROVAL` (`--fail-on-approval` blocks merge) - a dep-only PR with no AI-artifact change is left to SCA. Not replacing package-manager security scanners. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
+**Supply chain (npm, crates.io, PyPI, …):** classic malware-in-the-lockfile is still Dependabot / SCA / provenance. Agents make it worse by proposing or merging deps at machine speed. Airlock’s angle is the **AI release surface**: when a prompt/skill/MCP/agent change also expands an APM-tracked package dependency, that lands in blast radius as `NEEDS_APPROVAL` (`--fail-on-approval` blocks merge) - a dep-only PR with no AI-artifact change is left to SCA. Not replacing package-manager security scanners. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
 
 ### If you use LangSmith (or Braintrust / Langfuse / Phoenix)
 
@@ -318,7 +318,7 @@ Keep the observability + eval platform. Airlock is the **release gate beside it*
 3. Tune `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@<tag>` after checkout.
 4. Optional: feed production signal via `airlock ingest otel` → `baseline` / `drift` (OTel JSONL; not a live LangSmith API sync yet).
 
-**Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#langsmith--braintrust--langfuse--phoenix).
+**Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
 
 ---
 
@@ -381,7 +381,7 @@ flowchart TB
 | Langfuse / remote prompt registries | Not yet |
 | Live MCP schema fetch | HTTP(S) servers at scan time; stdio config-hash only |
 
-Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [Developer guide — discovery](https://xdlc-labs.github.io/documentation/airlock/guide/#what-init-discovers-today).
+Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [Developer guide — discovery](https://xdlc.dev/airlock/docs#what-init-discovers-today).
 
 ## Commands
 
@@ -404,7 +404,7 @@ Gates fire only when a confidence interval **excludes** the threshold. Cassettes
 
 ## Status
 
-Public beta: snapshot, diff, eval, policy, and the CI Action. Release notes: [CHANGELOG.md](CHANGELOG.md). What might come later: [roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
+Public beta: snapshot, diff, eval, policy, and the CI Action. Release notes: [CHANGELOG.md](CHANGELOG.md). What might come later: [roadmap](https://xdlc.dev/airlock/docs/roadmap).
 
 ## Development
 
@@ -415,7 +415,7 @@ golangci-lint run ./...
 
 This repository’s CI is [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go test/lint). Releases: [docs/RELEASING.md](docs/RELEASING.md).
 
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](https://xdlc-labs.github.io/documentation/airlock/guide/) · [Roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/)
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](https://xdlc.dev/airlock/docs) · [Roadmap](https://xdlc.dev/airlock/docs/roadmap)
 
 ## Related
 
