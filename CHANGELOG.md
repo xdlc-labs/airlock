@@ -7,10 +7,16 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 
 ## [Unreleased]
 
-Reusable GitHub Action so an app repo does not copy a 100-line workflow. Tag as `v0.1.0-beta.7` after CI on this change is green.
+### Added
+### Changed
+### Fixed
+
+## [0.1.0-beta.7] – 2026-09-07
+
+Reusable GitHub Action: checkout, then `uses: xdlc-labs/airlock@v0.1.0-beta.7`.
 
 ### Added
-- Root `action.yml`: checkout, then `uses: xdlc-labs/airlock@<tag>`. Builds the CLI, diffs merge-base vs HEAD, comments on the PR, fail-closed on approval.
+- Root `action.yml`. Builds the CLI, diffs merge-base vs HEAD, comments on the PR, fail-closed on approval.
 - `airlock ci --fail-on-inconclusive`: `--fail-on-eval` alone only ever tripped CI on `FAIL`, so default thresholds (`0.99`/`0.995` min) against the default `max_samples_per_case: 5` could sit at `INCONCLUSIVE` indefinitely with nothing failing the build. The new flag fails closed on `INCONCLUSIVE` too (and still fails on `FAIL` when enabled alone).
 - Comparative eval gates (`task_success` regression, `adversarial_critical`) now show a `SKIPPED` row with reason when no baseline result exists to compare against, instead of silently vanishing from the report with zero trace. `SKIPPED` never fails closed on its own.
 - Skill hashing now covers the whole skill directory (`manifest.HashDirTree`), not just `SKILL.md` — a sibling script/resource changing without touching `SKILL.md` used to go undetected; it now registers as a skill change.
@@ -125,7 +131,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.6...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.7...HEAD
+[0.1.0-beta.7]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.6...v0.1.0-beta.7
 [0.1.0-beta.6]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.5...v0.1.0-beta.6
 [0.1.0-beta.5]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.4...v0.1.0-beta.5
 [0.1.0-beta.4]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.3...v0.1.0-beta.4

@@ -79,8 +79,8 @@ This repo is the CLI, the Action, and the local store. There is no hosted dashbo
 Pin a **pre-release** tag from [Releases](https://github.com/xdlc-labs/airlock/releases) (GitHub “latest” skips them). Current tag: see [CHANGELOG](CHANGELOG.md).
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.6 bash
-# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.6
+curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.7 bash
+# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.7
 ```
 
 ## Quick start - break a prompt, watch Airlock catch it
@@ -217,7 +217,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: xdlc-labs/airlock@v0.1.0-beta.7 # pin a release tag once this Action ships
+      - uses: xdlc-labs/airlock@v0.1.0-beta.7
 ```
 
 That is the whole install. The Action builds the CLI, diffs merge-base vs HEAD, and comments on the PR. Fail-closed on permission expansion by default.
