@@ -1,23 +1,36 @@
-# Airlock
+<p align="center">
+  <strong>Airlock</strong>
+</p>
 
-**AI release engineering.**
+<p align="center">
+  <strong>AI release engineering. CI gate for prompts, skills, MCP, and models.</strong>
+</p>
 
-GitHub Actions for safely shipping AI agents - CI release gate for prompts, skills, MCP, and models. Not another eval platform.
+<p align="center">
+  <a href="https://github.com/xdlc-labs/airlock/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xdlc-labs/airlock/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
+  <a href="https://github.com/xdlc-labs/airlock/releases"><img src="https://img.shields.io/github/v/release/xdlc-labs/airlock?include_prereleases&style=flat-square" alt="Release"></a>
+  <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
+</p>
 
-Airlock is the release-control layer for AI systems: it treats models, prompts, tools, skills, MCP servers, judges, and eval sets as a **releasable unit**, detects what changed, evaluates behavior against policy with **statistical confidence**, and **blocks or approves** the ship - including when the change came from upstream, not from your commit.
+---
+
+GitHub Actions for safely shipping AI agents — CI release gate for prompts, skills, MCP, and models. Not another eval platform.
+
+Airlock treats models, prompts, tools, skills, MCP servers, judges, and eval sets as a **releasable unit**, detects what changed, evaluates behavior against policy with **statistical confidence**, and **blocks or approves** the ship — including when the change came from upstream.
 
 The open-source distribution is a local-first Go toolchain (binary + CI Action + `.airlock/` store). Prove that gate in CI first; the hosted control plane comes later (open-core).
 
-[![CI](https://github.com/xdlc-labs/airlock/actions/workflows/ci.yml/badge.svg)](https://github.com/xdlc-labs/airlock/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/go-1.25+-00ADD8?logo=go&logoColor=white)](go.mod)
-[![Release](https://img.shields.io/github/v/release/xdlc-labs/airlock?include_prereleases)](https://github.com/xdlc-labs/airlock/releases)
+> First public beta · no telemetry · [Apache-2.0](LICENSE) · state under `.airlock/` · versions in [CHANGELOG](CHANGELOG.md)
 
-> First public beta · no telemetry · [Apache-2.0](LICENSE) · state under `.airlock/` · versions in [CHANGELOG](CHANGELOG.md)  
-> **APM** tells you what the agent depends on · **eval platforms** tell you how it scored · **Airlock** tells you whether that change is safe to ship.  
-> Not a Promptfoo/Braintrust replacement - the release gate beside them.
+## What you get
 
----
+- **AI manifest** — agents, models, prompts, tools, skills, MCP, judges, evals
+- **Snapshot + behavioral diff** — blast radius with statistical CIs, not point estimates
+- **Policy engine** — `PASS` / `FAIL` / `NEEDS_APPROVAL` on the PR
+- **Cassette replay** — cheap CI without live provider calls
+- **Local-first** — state under `.airlock/`; nothing uploads by default
+- **Beside eval platforms** — keep LangSmith / Promptfoo; Airlock is the ship-or-block gate
 
 ## The problem
 
@@ -48,7 +61,7 @@ State lives under **`.airlock/`** in your **application** repo. Nothing uploads 
 | Teams that change prompts or models often and want PR gates | Expecting a hosted org dashboard today (Phase 5+) |
 | Repos with eval cases / Promptfoo, or OTel GenAI spans | Need full SDK AST for every framework *now* |
 
-**Not yet:** hosted control plane (Phase 5), enterprise SSO / EU / K8s (Phase 6), release agent (Phase 7). See [docs/ROADMAP.md](docs/ROADMAP.md).
+**Not yet:** hosted control plane (Phase 5), enterprise SSO / EU / K8s (Phase 6), release agent (Phase 7). See [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/).
 
 ---
 
@@ -174,11 +187,11 @@ airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base …
 exit 1   # merge blocked until: airlock approve --base … --head …
 ```
 
-A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](docs/ROADMAP.md#agent-driven-supply-chain).
+A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
 
 That is the company wedge: **AI change control on the PR**, not “hope the prompt looks fine.”
 
-`--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[docs/GUIDE.md](docs/GUIDE.md)**.
+`--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[Developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/)**.
 
 ## Use it on your repo
 
@@ -198,7 +211,7 @@ Airlock gates **AI release risk** on the PR - not general AppSec:
 
 Skill / MCP power expansion → `NEEDS_APPROVAL`. Approvals are advisory until CI uses `--fail-on-approval`.
 
-**Supply chain (npm, crates.io, PyPI, …):** classic malware-in-the-lockfile is still Dependabot / SCA / provenance. Agents make it worse by proposing or merging deps at machine speed. Airlock’s angle is the **AI release surface**: when a prompt/skill/MCP/agent change also expands an APM-tracked package dependency, that lands in blast radius as `NEEDS_APPROVAL` (`--fail-on-approval` blocks merge) - a dep-only PR with no AI-artifact change is left to SCA. Not replacing package-manager security scanners. Details: [docs/ROADMAP.md](docs/ROADMAP.md#agent-driven-supply-chain).
+**Supply chain (npm, crates.io, PyPI, …):** classic malware-in-the-lockfile is still Dependabot / SCA / provenance. Agents make it worse by proposing or merging deps at machine speed. Airlock’s angle is the **AI release surface**: when a prompt/skill/MCP/agent change also expands an APM-tracked package dependency, that lands in blast radius as `NEEDS_APPROVAL` (`--fail-on-approval` blocks merge) - a dep-only PR with no AI-artifact change is left to SCA. Not replacing package-manager security scanners. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
 
 ### If you use LangSmith (or Braintrust / Langfuse / Phoenix)
 
@@ -216,7 +229,7 @@ Keep the observability + eval platform. Airlock is the **release gate beside it*
 3. Tune `.airlock/policy.yml` thresholds; add the [sample workflow](.github/workflows/airlock.yml) with `--fail-on-eval` / `--fail-on-approval`.
 4. Optional: feed production signal via `airlock ingest otel` → `baseline` / `drift` (OTel JSONL; not a live LangSmith API sync yet).
 
-**Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](docs/ROADMAP.md#langsmith--braintrust--langfuse--phoenix).
+**Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#langsmith--braintrust--langfuse--phoenix).
 
 ---
 
@@ -282,7 +295,7 @@ flowchart TB
 | Langfuse / remote prompt registries | Not yet |
 | Live MCP schema fetch | HTTP(S) servers at scan time; stdio config-hash only |
 
-Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [GUIDE - discovery](docs/GUIDE.md#discovery-coverage-honest).
+Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [GUIDE - discovery](https://xdlc-labs.github.io/documentation/airlock/guide/#discovery-coverage-honest).
 
 ## Commands
 
@@ -317,7 +330,7 @@ Gates fire only when a confidence interval **excludes** the threshold. Cassettes
 OSS release gate (now)  →  prove in CI  →  Phase 5 team plane  →  Phase 6 enterprise  →  Phase 7 release agent
 ```
 
-**Details:** [docs/ROADMAP.md](docs/ROADMAP.md) - thesis, open-core, integration maps, explicit non-goals (incl. “not code test selection”).
+**Details:** [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/) - thesis, open-core, integration maps, explicit non-goals (incl. “not code test selection”).
 
 Design-partner outreach continues (process, not a phase). Release notes: [CHANGELOG.md](CHANGELOG.md).
 
@@ -330,7 +343,15 @@ golangci-lint run ./...
 
 This repository’s CI is [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go test/lint). Releases: [docs/RELEASING.md](docs/RELEASING.md).
 
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](docs/GUIDE.md) · [Roadmap](docs/ROADMAP.md)
+[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](https://xdlc-labs.github.io/documentation/airlock/guide/) · [Roadmap](https://xdlc-labs.github.io/documentation/airlock/roadmap/)
+
+
+
+## In this org
+
+- [xdlc-agent](https://github.com/xdlc-labs/xdlc-agent) — self-hosted CI Fix daemon
+- [documentation](https://xdlc-labs.github.io/documentation/) — hosted guides
+- [example-service](https://github.com/xdlc-labs/example-service) — xdlc-agent battleground
 
 ## License
 
