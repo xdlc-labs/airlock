@@ -1,4 +1,4 @@
-name: Airlock AI gate
+name: Airlock AI release gate
 description: Gate AI artifact changes on a pull request.
 author: xdlc-labs
 branding:
