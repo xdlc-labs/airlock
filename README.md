@@ -203,9 +203,26 @@ The job is **AI change control on the PR**, not hoping the prompt looks fine.
 
 ## Use it on your repo
 
-1. In your **application** repo: `airlock init` → commit `.airlock/policy.yml` (and keep snapshots as you prefer).
-2. Copy [`.github/workflows/airlock.yml`](.github/workflows/airlock.yml) into that repo (not into this one).
-3. Fail closed with `--fail-on-approval` / `--fail-on-eval` (sample workflow defaults `AIRLOCK_FAIL_ON_APPROVAL=true`).
+```yaml
+# .github/workflows/airlock.yml
+name: Airlock
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  airlock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: xdlc-labs/airlock@v0.1.0-beta.7 # pin a release tag once this Action ships
+```
+
+That is the whole install. The Action builds the CLI, diffs merge-base vs HEAD, and comments on the PR. Fail-closed on permission expansion by default.
+
+Optional: `airlock init` and commit `.airlock/policy.yml` if you want custom gates. CI generates a stub when that file is missing.
 
 ### Security in CI
 
@@ -234,7 +251,7 @@ Keep the observability + eval platform. Airlock is the **release gate beside it*
 
 1. Keep tracing and datasets in LangSmith (or similar).
 2. In the **application** repo: `airlock init`, point evals at cases you already trust (Promptfoo YAML, or export dataset → Airlock eval JSONL / `airlock import promptfoo`).
-3. Tune `.airlock/policy.yml` thresholds; add the [sample workflow](.github/workflows/airlock.yml) with `--fail-on-eval` / `--fail-on-approval`.
+3. Tune `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@<tag>` after checkout (`fail-on-eval` / `fail-on-approval` inputs).
 4. Optional: feed production signal via `airlock ingest otel` → `baseline` / `drift` (OTel JSONL; not a live LangSmith API sync yet).
 
 **Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#langsmith--braintrust--langfuse--phoenix).

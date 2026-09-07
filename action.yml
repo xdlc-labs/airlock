@@ -1,0 +1,80 @@
+name: Airlock
+description: Snapshot, diff, and gate AI artifact changes on a pull request.
+author: xdlc-labs
+branding:
+  icon: lock
+  color: green
+
+inputs:
+  fail-on-approval:
+    description: Fail the job when MCP or skill expansion needs approval.
+    required: false
+    default: "true"
+  fail-on-eval:
+    description: Fail the job on an eval FAIL verdict.
+    required: false
+    default: "false"
+  fail-on-ai-change:
+    description: Fail the job on any AI artifact change.
+    required: false
+    default: "false"
+  fail-on-inconclusive:
+    description: Fail the job when a gate stays INCONCLUSIVE.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: "1.25.x"
+        cache-dependency-path: ${{ github.action_path }}/go.sum
+
+    - name: Build airlock
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: go build -o /tmp/airlock ./cmd/airlock
+
+    - name: Snapshot and gate
+      shell: bash
+      env:
+        AIRLOCK: /tmp/airlock
+        FAIL_ON_APPROVAL: ${{ inputs.fail-on-approval }}
+        FAIL_ON_EVAL: ${{ inputs.fail-on-eval }}
+        FAIL_ON_AI_CHANGE: ${{ inputs.fail-on-ai-change }}
+        FAIL_ON_INCONCLUSIVE: ${{ inputs.fail-on-inconclusive }}
+      run: bash "${{ github.action_path }}/scripts/github-action.sh"
+
+    - name: Comment on PR
+      if: always() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          if (!fs.existsSync('/tmp/airlock-comment.md')) {
+            return;
+          }
+          const body = fs.readFileSync('/tmp/airlock-comment.md', 'utf8');
+          const marker = '### Airlock';
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }

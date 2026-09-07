@@ -10,100 +10,10 @@ permissions:
   pull-requests: write
 
 jobs:
-  airlock-diff:
+  airlock:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.x"
-
-      - name: Build airlock
-        run: go build -o /tmp/airlock ./cmd/airlock
-
-      - name: Snapshot merge-base and PR head
-        id: airlock
-        env:
-          FAIL_ON_AI_CHANGE: ${{ vars.AIRLOCK_FAIL_ON_AI_CHANGE || 'false' }}
-          # Default fail-closed on permission/skill/MCP expansion; set repo var to 'false' to soften.
-          FAIL_ON_APPROVAL: ${{ vars.AIRLOCK_FAIL_ON_APPROVAL || 'true' }}
-          FAIL_ON_EVAL: ${{ vars.AIRLOCK_FAIL_ON_EVAL || 'false' }}
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_REF="origin/${{ github.base_ref }}"
-            git fetch origin "${{ github.base_ref }}" --depth=0 2>/dev/null || true
-            BASE_SHA=$(git merge-base "$BASE_REF" HEAD 2>/dev/null || git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
-            HEAD_SHA=${{ github.sha }}
-          else
-            # workflow_dispatch smoke: compare HEAD~1 → HEAD when history exists
-            HEAD_SHA=$(git rev-parse HEAD)
-            BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "$HEAD_SHA")
-          fi
-
-          work=$(mktemp -d)
-          git worktree add --detach "$work/base" "$BASE_SHA"
-          git worktree add --detach "$work/head" "$HEAD_SHA"
-
-          (cd "$work/base" && /tmp/airlock init && /tmp/airlock snapshot)
-          BASE_ID=$(basename "$(ls -1t "$work/base/.airlock/snapshots/"*.json | head -1)" .json)
-
-          mkdir -p "$work/head/.airlock/snapshots"
-          cp -a "$work/base/.airlock/snapshots/." "$work/head/.airlock/snapshots/"
-          (cd "$work/head" && /tmp/airlock init && /tmp/airlock snapshot)
-
-          CI_FLAGS=(--base "$BASE_ID" --head working --comment)
-          if [ "$FAIL_ON_APPROVAL" = "true" ]; then
-            CI_FLAGS+=(--fail-on-approval)
-          fi
-          if [ "$FAIL_ON_EVAL" = "true" ]; then
-            CI_FLAGS+=(--fail-on-eval)
-          fi
-          (cd "$work/head" && /tmp/airlock ci "${CI_FLAGS[@]}") | tee /tmp/airlock-comment.md
-
-          if [ "$FAIL_ON_AI_CHANGE" = "true" ]; then
-            (cd "$work/head" && /tmp/airlock ci --base "$BASE_ID" --head working --fail-on-change)
-          fi
-
-          git worktree remove --force "$work/base" || true
-          git worktree remove --force "$work/head" || true
-
-      - name: Comment on PR
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            if (!fs.existsSync('/tmp/airlock-comment.md')) {
-              // Earlier step (checkout/build) failed before airlock ci ever ran;
-              // nothing to post — leave the red X on the Actions tab as the signal.
-              return;
-            }
-            const body = fs.readFileSync('/tmp/airlock-comment.md', 'utf8');
-            const marker = '### Airlock';
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body,
-              });
-            }
+      - uses: ./
