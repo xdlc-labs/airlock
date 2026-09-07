@@ -36,14 +36,10 @@ func Create(root string, rescan bool) (*manifest.Snapshot, error) {
 	}
 
 	arts := manifest.Artifacts(m)
-	body, err := json.Marshal(struct {
-		Artifacts []manifest.ArtifactRef `json:"artifacts"`
-		Manifest  manifest.Manifest      `json:"manifest"`
-	}{Artifacts: arts, Manifest: *m})
+	id, err := contentID(arts, *m)
 	if err != nil {
 		return nil, err
 	}
-	id := manifest.HashBytes(body)[:16]
 	mh := manifest.HashBytes(mustJSON(m))
 
 	snap := &manifest.Snapshot{
@@ -92,6 +88,22 @@ func Load(root, id string) (*manifest.Snapshot, error) {
 		}
 	}
 	return store.ReadSnapshot(p, id)
+}
+
+// contentID hashes artifacts plus the manifest, with GeneratedAt and Root
+// cleared. Those fields change every CI run (clock, mktemp worktree path)
+// and must not rotate the snapshot id that airlock approve keys on.
+func contentID(arts []manifest.ArtifactRef, m manifest.Manifest) (string, error) {
+	m.GeneratedAt = time.Time{}
+	m.Root = ""
+	body, err := json.Marshal(struct {
+		Artifacts []manifest.ArtifactRef `json:"artifacts"`
+		Manifest  manifest.Manifest      `json:"manifest"`
+	}{Artifacts: arts, Manifest: m})
+	if err != nil {
+		return "", err
+	}
+	return manifest.HashBytes(body)[:16], nil
 }
 
 func mustJSON(v any) []byte {

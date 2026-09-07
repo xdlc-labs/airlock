@@ -10,6 +10,7 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ### Added
 ### Changed
 ### Fixed
+- Snapshot IDs no longer hash `generated_at` or the absolute `root` path. CI was minting a new base id every run, so `airlock approve --base` from the PR comment could not unblock the next job.
 
 ## [0.1.0-beta.7] – 2026-09-07
 
