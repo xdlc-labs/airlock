@@ -10,6 +10,10 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ### Added
 ### Changed
 ### Fixed
+
+## [0.1.0-beta.8] – 2026-09-07
+
+### Fixed
 - Snapshot IDs no longer hash `generated_at` or the absolute `root` path. CI was minting a new base id every run, so `airlock approve --base` from the PR comment could not unblock the next job.
 
 ## [0.1.0-beta.7] – 2026-09-07
@@ -132,7 +136,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.7...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.8...HEAD
+[0.1.0-beta.8]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.7...v0.1.0-beta.8
 [0.1.0-beta.7]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.6...v0.1.0-beta.7
 [0.1.0-beta.6]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.5...v0.1.0-beta.6
 [0.1.0-beta.5]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.4...v0.1.0-beta.5
