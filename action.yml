@@ -1,5 +1,9 @@
 name: Airlock
 description: Gate AI artifact changes on a pull request.
+author: xdlc-labs
+branding:
+  icon: shield
+  color: blue
 
 runs:
   using: composite

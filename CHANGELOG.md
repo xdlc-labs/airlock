@@ -10,12 +10,23 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ### Added
 
 ### Changed
+
+### Fixed
+
+## [0.1.0-beta.9] – 2026-09-07
+
+GitHub Marketplace listing for the reusable Action. Pin `uses: xdlc-labs/airlock@v0.1.0-beta.9`.
+
+### Highlights
+- Boxed CLI cards on the terminal. GitHub alert PR comments.
+- Action downloads the release binary on a `v*` tag instead of compiling Go on every PR.
+
+### Changed
 - Daily CLI commands (`init`, `snapshot`, `diff`, `test`, `ci`, `approve`) write boxed cards to stderr. Color is TTY-only. GitHub Actions gets `::notice::` / `::warning::` / `::error::` for the verdict.
 - `airlock ci --comment` no longer prints the PR body on stdout. `.airlock/ci-comment.md` is always written.
 - PR comments use GitHub alerts (`TIP` / `WARNING` / `CAUTION` / `NOTE`), a one-row summary table, and `+` / `~` / `-` change marks.
 - GitHub Action prints a numbered 1/5 setup trail, groups noisy steps, posts the comment file (update or create by marker), and copies that comment into the job summary. Downloads a release binary when the action ref is a `v*` tag.
-
-### Fixed
+- `action.yml` has Marketplace branding (`shield` / `blue`).
 
 ## [0.1.0-beta.8] – 2026-09-07
 
@@ -142,7 +153,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.8...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.9...HEAD
+[0.1.0-beta.9]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.8...v0.1.0-beta.9
 [0.1.0-beta.8]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.7...v0.1.0-beta.8
 [0.1.0-beta.7]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.6...v0.1.0-beta.7
 [0.1.0-beta.6]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.5...v0.1.0-beta.6
