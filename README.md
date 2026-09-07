@@ -41,14 +41,18 @@ And its mirror: **did a change we never made just get released to us?**
 
 ## How it works
 
-```mermaid
-flowchart LR
-  edit["Edit prompt / skill / MCP"]
-  snap["Snapshot"]
-  diffNode["Diff + blast radius"]
-  policy["Policy: PASS / FAIL / NEEDS_APPROVAL"]
-  ship["Ship or block in CI"]
-  edit --> snap --> diffNode --> policy --> ship
+Same flow as the [developer guide](https://xdlc-labs.github.io/documentation/airlock/guide/#how-a-change-is-gated):
+
+```text
+edit prompt / skill / model / MCP / tools
+        ↓
+airlock snapshot          # freeze what the AI system is
+        ↓
+airlock diff              # what changed, and which agents it hits
+        ↓
+airlock test / airlock ci # evals + policy verdict
+        ↓
+ship / block / human approve
 ```
 
 State lives under **`.airlock/`** in your **application** repo. Nothing uploads by default.
@@ -295,7 +299,7 @@ flowchart TB
 | Langfuse / remote prompt registries | Not yet |
 | Live MCP schema fetch | HTTP(S) servers at scan time; stdio config-hash only |
 
-Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [GUIDE - discovery](https://xdlc-labs.github.io/documentation/airlock/guide/#discovery-coverage-honest).
+Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [Developer guide — discovery](https://xdlc-labs.github.io/documentation/airlock/guide/#what-init-discovers-today).
 
 ## Commands
 
