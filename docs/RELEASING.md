@@ -13,7 +13,7 @@ Version history for users: [CHANGELOG.md](../CHANGELOG.md). The **only** doc tha
    - Move items from **Unreleased** under the new version heading (`Added` / `Changed` / `Fixed`).
    - For prereleases, keep a short **Highlights** + **Known limits** block when useful.
    - Update compare links at the bottom of `CHANGELOG.md`.
-3. Update the install pin in [README.md](../README.md) (`AIRLOCK_VERSION=…` / `go install @…`) — nowhere else.
+3. Update the install pin in [README.md](../README.md) (`AIRLOCK_VERSION=…` / `go install @…` / `uses: xdlc-labs/airlock@…`) — nowhere else.
 4. Tag and push (must start with `v`):
 
 ```bash
