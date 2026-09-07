@@ -24,6 +24,7 @@ import (
 	"github.com/xdlc-labs/airlock/internal/judge"
 	"github.com/xdlc-labs/airlock/internal/langsmith"
 	"github.com/xdlc-labs/airlock/internal/manifest"
+	"github.com/xdlc-labs/airlock/internal/out"
 	"github.com/xdlc-labs/airlock/internal/policy"
 	"github.com/xdlc-labs/airlock/internal/promptfoo"
 	"github.com/xdlc-labs/airlock/internal/providers"
@@ -85,38 +86,41 @@ func main() {
 		os.Exit(2)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "airlock %s: %v\n", cmd, err)
+		fmt.Fprintf(os.Stderr, "error: airlock %s: %v\n", cmd, err)
 		os.Exit(1)
 	}
 }
 
 func usage(w *os.File) {
-	fmt.Fprintf(w, `airlock — CI/CD for AI behavior (Phase 2 closeout + Phase 3 OSS wedge)
+	fmt.Fprintf(w, `airlock  CI gate for prompts, skills, MCP, and models
 
 Usage:
   airlock <command> [flags]
 
 Commands:
-  init / snapshot / diff         Discover, snapshot, static blast-radius diff
-  test                           Run eval suite (Wilson/bootstrap CIs, budgets)
-  ci                             Diff + evals + NEEDS_APPROVAL + PR comment
-  import promptfoo|langsmith|braintrust <file>  Import eval corpora
-  eval promote --from ingest|results     Promote runs → eval cases
-  ingest otel --file spans.jsonl Ingest OTel GenAI JSONL (local redaction)
-  baseline create --from ingest  Promote ingest → .airlock/evals/prod.jsonl
-  drift [--baseline FILE]        Compare live ingest vs baseline success rates
-  history [--serve :8787]        Read-only local history UI
-  judge calibrate|attribution    Pin/calibrate judges; attribution on pin change
-  approve --base ID --head ID    Record human approval for permission expansion
-  rollback --to SNAPSHOT         Re-pin known-good manifest + routing hint JSON
-  sentinel probe|check           Fingerprint upstream models (silent drift)
-  version / help
+  init        Discover AI artifacts into .airlock/
+  snapshot    Freeze a content-addressed snapshot
+  diff        Show changes vs a base snapshot
+  test        Run the eval suite
+  ci          Diff, evals, approval gate, write PR comment
+  import      Import promptfoo, langsmith, or braintrust cases
+  eval        Promote ingest or results into eval cases
+  ingest      Ingest OTel GenAI JSONL (local redaction)
+  baseline    Promote ingest into .airlock/evals/prod.jsonl
+  drift       Compare live ingest vs baseline
+  history     Local release history (optional --serve :8787)
+  judge       Calibrate judges or measure attribution
+  approve     Record human approval for permission expansion
+  rollback    Re-pin a known-good snapshot
+  sentinel    Fingerprint upstream models
+  version     Print version
+  help        Show this help
 
 test flags: --path --suite --affected --mode --json --baseline-results ID --adversarial
 ci flags:   --fail-on-change --fail-on-eval --fail-on-inconclusive --fail-on-approval --fail-on-sentinel --comment --skip-eval --adversarial
 redact:     --redact pii|hash|off (ingest / baseline)
 
-Local-first. No cloud upload.
+Local-first. Nothing uploads.
 `)
 }
 
@@ -157,9 +161,17 @@ func cmdInit(args []string) error {
 		return err
 	}
 	_ = evalcase.WriteBindingsStub(evalcase.DefaultBindingsPath(root))
-	fmt.Printf("Wrote %s\n", p.Manifest)
-	fmt.Printf("  agents=%d models=%d prompts=%d tools=%d skills=%d mcp=%d evals=%d\n",
-		len(m.Agents), len(m.Models), len(m.Prompts), len(m.Tools), len(m.Skills), len(m.MCPServers), len(m.Evals))
+	wrote := p.Manifest
+	if rel, err := filepath.Rel(root, p.Manifest); err == nil {
+		wrote = rel
+	}
+	out.Print(out.Frame("airlock init", []string{
+		fmt.Sprintf("agents  %-4d  models  %-4d  prompts  %d", len(m.Agents), len(m.Models), len(m.Prompts)),
+		fmt.Sprintf("tools   %-4d  skills  %-4d  mcp      %d", len(m.Tools), len(m.Skills), len(m.MCPServers)),
+		fmt.Sprintf("evals   %d", len(m.Evals)),
+		"",
+		"wrote  " + wrote,
+	}))
 	return nil
 }
 
@@ -182,7 +194,10 @@ func cmdSnapshot(args []string) error {
 			return err
 		}
 	}
-	fmt.Println(snapshot.Summarize(snap))
+	out.Print(out.Frame("snapshot", []string{
+		snap.ID,
+		fmt.Sprintf("artifacts  %d    manifest  %s", len(snap.Artifacts), snap.ManifestHash[:min(12, len(snap.ManifestHash))]),
+	}))
 	return nil
 }
 
@@ -218,7 +233,7 @@ func cmdDiff(args []string) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(r)
 	}
-	fmt.Print(diff.FormatText(r))
+	out.Print(diff.FormatText(r))
 	return nil
 }
 
@@ -319,7 +334,7 @@ func cmdTest(args []string) error {
 			return err
 		}
 		cases = evalcase.FilterByAgents(cases, agents)
-		fmt.Printf("affected agents: %s (%d cases)\n", strings.Join(agents, ", "), len(cases))
+		out.Printf("affected agents: %s (%d cases)\n", strings.Join(agents, ", "), len(cases))
 	}
 	if len(cases) == 0 {
 		return fmt.Errorf("no cases to run")
@@ -344,7 +359,9 @@ func cmdTest(args []string) error {
 	if base, err := evaluation.FindBaseline(store.ForRoot(root).Results, baseResults); err == nil {
 		cfg.Baseline = evaluation.BaselineFromResult(base)
 		baseRes = base
-		fmt.Printf("paired baseline: %s\n", base.SnapshotID)
+		if base.SnapshotID != "" {
+			out.Printf("paired baseline: %s\n", base.SnapshotID)
+		}
 	}
 	reg := loadJudges(root, client)
 	if len(reg.ByID) > 0 {
@@ -364,16 +381,22 @@ func cmdTest(args []string) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(res)
 	}
-	fmt.Print(policy.FormatTable(res.Report))
+	if table := policy.FormatTable(res.Report); table != "" {
+		out.Print(out.FrameText("eval", table))
+	}
 	if baseRes != nil {
 		if rows := evaluation.CompareResults(baseRes, res, pol); len(rows) > 0 {
-			fmt.Print(evaluation.FormatCompareText(rows))
+			out.Print(evaluation.FormatCompareText(rows))
 		}
 	}
 	if res.BudgetStopped {
-		fmt.Printf("budget_stopped total_cost=$%.4f\n", res.TotalCostUSD)
+		out.Printf("budget_stopped total_cost=$%.4f\n", res.TotalCostUSD)
 	}
-	fmt.Printf("samples=%d cost=$%.4f wrote %s\n", len(res.Samples), res.TotalCostUSD, filepath.Join(store.ForRoot(root).Results, "latest.json"))
+	wrote := filepath.Join(store.ForRoot(root).Results, "latest.json")
+	if rel, err := filepath.Rel(root, wrote); err == nil {
+		wrote = rel
+	}
+	out.Verdict(string(res.Report.Overall), fmt.Sprintf("samples=%d  cost=$%.4f  wrote  %s", len(res.Samples), res.TotalCostUSD, wrote))
 	if res.Report.Overall == policy.Fail {
 		return fmt.Errorf("eval verdict FAIL")
 	}
@@ -425,7 +448,7 @@ func cmdCI(args []string) error {
 	args, failInconclusive := flagBool(args, "--fail-on-inconclusive")
 	args, failApproval := flagBool(args, "--fail-on-approval")
 	args, failSentinel := flagBool(args, "--fail-on-sentinel")
-	args, commentOnly := flagBool(args, "--comment")
+	args, _ = flagBool(args, "--comment") // kept: comment file is always written
 	args, skipEval := flagBool(args, "--skip-eval")
 	args, adversarial := flagBool(args, "--adversarial")
 	args, baseID := flagVal(args, "--base")
@@ -471,44 +494,62 @@ func cmdCI(args []string) error {
 				res.Report = policy.WithNeedsApproval(res.Report, dr.NeedsApproval, dr.ApprovalReasons)
 				res.Report = applyJudgeFloors(res.Report, store.ForRoot(root).Judges, reg)
 				evalReport = &res.Report
-				evalMD = "\n" + policy.FormatMarkdown(res.Report)
+				evalMD = policy.FormatMarkdown(res.Report)
 				if baseRes != nil {
 					evalMD += evaluation.FormatCompareMarkdown(evaluation.CompareResults(baseRes, res, pol))
 				}
 				_ = evaluation.SaveResult(store.ForRoot(root).Results, head.ID, res)
 			} else {
-				evalMD = fmt.Sprintf("\n### Airlock eval\n\n_eval error: %v_\n", rerr)
+				evalMD = fmt.Sprintf("\n### Eval\n\n_eval error: %v_\n", rerr)
 			}
 		}
 	}
 	if evalReport == nil && dr.NeedsApproval {
 		rep := policy.WithNeedsApproval(policy.Report{Overall: policy.Pass}, true, dr.ApprovalReasons)
 		evalReport = &rep
-		evalMD += "\n" + policy.FormatMarkdown(rep)
+		evalMD += policy.FormatMarkdown(rep)
 	}
 
-	body := diff.FormatComment(dr) + evalMD
+	overall := policy.Pass
+	if evalReport != nil {
+		overall = evalReport.Overall
+	} else if dr.NeedsApproval {
+		overall = policy.NeedsApproval
+	}
+	body := diff.FormatComment(dr, string(overall)) + evalMD
+	unblock := ""
 	if dr.NeedsApproval && !approval.Has(store.ForRoot(root).Approvals, base.ID, head.ID) {
-		body += fmt.Sprintf("\nRun `airlock approve --base %s --head %s` to unblock.\n", base.ID, head.ID)
+		unblock = fmt.Sprintf("airlock approve --base %s --head %s", base.ID, head.ID)
+		body += fmt.Sprintf("\n### Unblock\n\n```\n%s\n```\n", unblock)
 	}
-	if commentOnly {
-		fmt.Print(body)
-	} else {
-		fmt.Print(diff.FormatText(dr))
-		if evalReport != nil {
-			fmt.Print(policy.FormatTable(*evalReport))
-		}
+
+	p := store.ForRoot(root)
+	if err := p.Ensure(); err != nil {
+		return err
 	}
-	commentPath := filepath.Join(store.ForRoot(root).Airlock, "ci-comment.md")
+	commentPath := filepath.Join(p.Airlock, "ci-comment.md")
 	if err := os.WriteFile(commentPath, []byte(body), 0o644); err != nil {
 		return err
 	}
-	if !commentOnly {
-		fmt.Printf("Wrote %s\n", commentPath)
+	wrote := commentPath
+	if rel, err := filepath.Rel(root, commentPath); err == nil {
+		wrote = rel
 	}
 
-	// Fail-closed checks below MUST run regardless of --comment: a PR-comment
-	// mode is an output-format choice, not an escape hatch from the gate.
+	out.Print(diff.FormatText(dr))
+	if evalReport != nil {
+		if table := policy.FormatTable(*evalReport); table != "" {
+			out.Print(out.FrameText("eval", table))
+		}
+	}
+	extra := []string{"wrote  " + wrote}
+	if unblock != "" {
+		extra = append([]string{unblock}, extra...)
+	}
+	out.Verdict(string(overall), extra...)
+
+	// Fail-closed checks below MUST run regardless of --comment: writing a PR
+	// comment is not an escape hatch from the gate.
 	fail := failFlag || store.ReadPolicyFailOnChange(store.ForRoot(root))
 	if fail && diff.HasChanges(dr) {
 		return fmt.Errorf("AI artifacts changed (fail_on_ai_change)")
@@ -527,7 +568,7 @@ func cmdCI(args []string) error {
 				return err
 			}
 		} else if rep.HasDrift() {
-			fmt.Print(sentinel.FormatText(rep))
+			out.Print(sentinel.FormatText(rep))
 			if failSentinel {
 				return fmt.Errorf("model sentinel drift detected")
 			}
@@ -574,7 +615,7 @@ func cmdImportPromptfoo(args []string) error {
 		return err
 	}
 	for _, w := range res.Warnings {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		out.Warn(w)
 	}
 	return writeImportedCases(root, res.Cases, "default.jsonl")
 }
@@ -679,7 +720,7 @@ func resolveCasesForDiff(root string, dr *diff.Result, adversarial, secSurface, 
 		changes = append(changes, evalcase.ArtifactChange{Kind: c.Kind, ID: c.ID, Status: c.Status})
 	}
 	if names := evalcase.SelectSuites(changes, bindings); len(names) > 0 && diff.HasChanges(dr) {
-		fmt.Printf("artifact → suite bindings: %s\n", strings.Join(names, ", "))
+		out.Printf("artifact -> suite bindings: %s\n", strings.Join(names, ", "))
 		suite, cases, err := evalcase.LoadBoundCases(p.Evals, names)
 		if err == nil && len(cases) > 0 {
 			if len(dr.AffectedAgents) > 0 {
@@ -699,9 +740,9 @@ func resolveCasesForDiff(root string, dr *diff.Result, adversarial, secSurface, 
 		if tagged := evalcase.FilterByTag(cases, "adversarial"); len(tagged) > 0 {
 			cases = tagged
 			if mcpTouched {
-				fmt.Println("MCP change detected: running adversarial cases")
+				out.Print("MCP change detected: running adversarial cases")
 			} else if skillTouched {
-				fmt.Println("Skill change detected: running adversarial cases")
+				out.Print("Skill change detected: running adversarial cases")
 			}
 		} else if secSurface {
 			advPath := filepath.Join(suiteDir, "suite.adversarial.yml")
@@ -711,7 +752,7 @@ func resolveCasesForDiff(root string, dr *diff.Result, adversarial, secSurface, 
 				if skillTouched && !mcpTouched {
 					why = "Skill"
 				}
-				fmt.Printf("%s change detected: loaded %s\n", why, advPath)
+				out.Printf("%s change detected: loaded %s\n", why, advPath)
 			}
 		}
 	}
@@ -992,17 +1033,21 @@ func cmdApprove(args []string) error {
 		Reasons: dr.ApprovalReasons, DecidedBy: by, Note: note,
 	}
 	if len(dr.ApprovalReasons) > 0 {
-		fmt.Println("Reasons requiring approval:")
+		out.Print("Reasons requiring approval:")
 		for _, reason := range dr.ApprovalReasons {
-			fmt.Printf("  - %s\n", reason)
+			out.Printf("  - %s\n", reason)
 		}
 	} else if !dr.NeedsApproval {
-		fmt.Println("Note: this base/head pair currently has no NEEDS_APPROVAL reasons — recording approval anyway.")
+		out.Print("Note: this base/head pair currently has no NEEDS_APPROVAL reasons. Recording approval anyway.")
 	}
 	if err := approval.Write(p.Approvals, rec); err != nil {
 		return err
 	}
-	fmt.Printf("Approved %s → %s (%s)\n", base.ID, head.ID, approval.Path(p.Approvals, base.ID, head.ID))
+	wrote := approval.Path(p.Approvals, base.ID, head.ID)
+	if rel, err := filepath.Rel(root, wrote); err == nil {
+		wrote = rel
+	}
+	out.Printf("Approved %s -> %s (%s)\n", base.ID, head.ID, wrote)
 	return nil
 }
 

@@ -222,17 +222,22 @@ func merge(a, b VerdictKind) VerdictKind {
 }
 
 func FormatTable(r Report) string {
-	s := fmt.Sprintf("Verdict: %s\n", r.Overall)
-	s += fmt.Sprintf("%-14s %8s %18s %s\n", "metric", "rate", "95% CI", "gate")
+	if len(r.Metrics) == 0 {
+		return ""
+	}
+	s := fmt.Sprintf("%-16s %8s %18s  %s\n", "metric", "rate", "95% CI", "gate")
 	for _, m := range r.Metrics {
-		s += fmt.Sprintf("%-14s %7.1f%%  [%5.1f%%, %5.1f%%]  %s — %s\n",
+		s += fmt.Sprintf("%-16s %6.1f%%  [%5.1f%%, %5.1f%%]  %s  %s\n",
 			m.Name, m.CI.Estimate*100, m.CI.Low*100, m.CI.High*100, m.Verdict, m.Reason)
 	}
 	return s
 }
 
 func FormatMarkdown(r Report) string {
-	s := fmt.Sprintf("### Airlock eval\n\n**Verdict: %s**\n\n", r.Overall)
+	if len(r.Metrics) == 0 {
+		return ""
+	}
+	s := "\n### Eval\n\n"
 	s += "| metric | rate | 95% CI | gate | reason |\n|---|---:|---|---|---|\n"
 	for _, m := range r.Metrics {
 		s += fmt.Sprintf("| `%s` | %.1f%% | [%.1f%%, %.1f%%] | **%s** | %s |\n",

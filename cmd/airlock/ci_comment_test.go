@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +14,8 @@ import (
 // TestCmdCIFailOnApprovalStillGatesWithComment guards a regression where
 // `airlock ci --comment` returned before the --fail-on-approval / --fail-on-eval
 // / --fail-on-ai_change checks ran, silently exiting 0 on NEEDS_APPROVAL as
-// long as --comment was also passed. --comment must only change the stdout
-// format, never bypass the gate, and the PR-comment file must still be written.
+// long as --comment was also passed. --comment must never bypass the gate, and
+// the PR-comment file must still be written.
 func TestCmdCIFailOnApprovalStillGatesWithComment(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "prompts"), 0o755); err != nil {
@@ -62,6 +63,18 @@ packages:
 	if !strings.Contains(string(data), wantRemediation) {
 		t.Fatalf("comment missing remediation command %q, got:\n%s", wantRemediation, data)
 	}
+	if !strings.Contains(string(data), "<!-- airlock-gate -->") {
+		t.Fatalf("comment missing HTML marker, got:\n%s", data)
+	}
+	if !strings.Contains(string(data), "## Airlock") {
+		t.Fatalf("comment missing heading, got:\n%s", data)
+	}
+	if !strings.Contains(string(data), "**NEEDS_APPROVAL**") {
+		t.Fatalf("comment missing verdict heading, got:\n%s", data)
+	}
+	if !strings.Contains(string(data), "[!WARNING]") {
+		t.Fatalf("comment missing warning alert, got:\n%s", data)
+	}
 }
 
 // TestCmdCIApprovalRemediationOmittedOnceApproved guards that the comment
@@ -107,5 +120,48 @@ packages:
 	}
 	if strings.Contains(string(data), "airlock approve") {
 		t.Fatalf("comment should not nag for approval once already approved, got:\n%s", data)
+	}
+}
+
+func TestCmdCIDoesNotDumpMarkdownOnStdout(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	promptPath := filepath.Join(root, "prompts", "system.md")
+	if err := os.WriteFile(promptPath, []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base, err := snapshot.Create(root, true)
+	if err != nil {
+		t.Fatalf("baseline snapshot: %v", err)
+	}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stdout
+	os.Stdout = w
+	runErr := cmdCI([]string{"--path", root, "--base", base.ID, "--comment", "--skip-eval"})
+	_ = w.Close()
+	os.Stdout = old
+	data, readErr := io.ReadAll(r)
+	if readErr != nil {
+		t.Fatalf("read stdout: %v", readErr)
+	}
+	if runErr != nil {
+		t.Fatalf("cmdCI: %v", runErr)
+	}
+	if strings.Contains(string(data), "<!-- airlock-gate -->") || strings.Contains(string(data), "## Airlock:") {
+		t.Fatalf("PR markdown leaked to stdout:\n%s", data)
+	}
+	commentPath := filepath.Join(store.ForRoot(root).Airlock, "ci-comment.md")
+	body, statErr := os.ReadFile(commentPath)
+	if statErr != nil {
+		t.Fatalf("expected ci-comment.md: %v", statErr)
+	}
+	if !strings.Contains(string(body), "<!-- airlock-gate -->") {
+		t.Fatalf("comment file missing marker, got:\n%s", body)
 	}
 }

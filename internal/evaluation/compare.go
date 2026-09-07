@@ -79,9 +79,9 @@ func FormatCompareText(rows []CompareRow) string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("Experiment compare (candidate vs baseline):\n")
+	b.WriteString("Compare (candidate vs baseline)\n")
 	for _, r := range rows {
-		fmt.Fprintf(&b, "  %s  base=%.1f%% cand=%.1f%% delta=%+.1fpp [%+.1f, %+.1f] %s\n",
+		fmt.Fprintf(&b, "  %-16s  base=%.1f%%  cand=%.1f%%  delta=%+.1fpp [%+.1f, %+.1f]  %s\n",
 			r.Metric, r.BaseRate*100, r.CandRate*100,
 			r.Delta.Estimate*100, r.Delta.Low*100, r.Delta.High*100, r.Verdict)
 	}

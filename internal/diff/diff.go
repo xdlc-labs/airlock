@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/xdlc-labs/airlock/internal/manifest"
+	"github.com/xdlc-labs/airlock/internal/out"
 	"github.com/xdlc-labs/airlock/internal/xslices"
 )
 
@@ -295,58 +296,115 @@ func HasKind(r *Result, kind string) bool {
 	return false
 }
 
-// FormatText renders a human-readable report.
+// CommentMarker identifies the Airlock PR comment so CI can update it in place.
+const CommentMarker = "<!-- airlock-gate -->"
+
+// FormatText renders a boxed human-readable report for the terminal.
 func FormatText(r *Result) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "diff %s → %s\n", r.BaseID, r.HeadID)
-	if len(r.Changes) == 0 {
-		b.WriteString("No AI artifact changes.\n")
-		return b.String()
+	lines := []string{
+		"base  " + r.BaseID,
+		"head  " + r.HeadID,
 	}
-	b.WriteString("Changed AI artifacts:\n")
+	if len(r.Changes) == 0 {
+		lines = append(lines, "", "no AI artifact changes")
+		return out.Frame("airlock", lines)
+	}
+	lines = append(lines, "", "changed")
 	for _, c := range r.Changes {
+		g := out.Glyph(c.Status)
 		switch c.Status {
-		case "added":
-			fmt.Fprintf(&b, "  + %s:%s\n", c.Kind, c.ID)
-		case "removed":
-			fmt.Fprintf(&b, "  - %s:%s\n", c.Kind, c.ID)
-		case "changed":
-			fmt.Fprintf(&b, "  ~ %s:%s (%s → %s)\n", c.Kind, c.ID, short(c.OldHash), short(c.NewHash))
+		case "added", "removed":
+			lines = append(lines, fmt.Sprintf("  %s  %-12s %s", g, c.Kind, c.ID))
+		default:
+			lines = append(lines, fmt.Sprintf("  %s  %-12s %-20s %s -> %s",
+				g, c.Kind, c.ID, short(c.OldHash), short(c.NewHash)))
 		}
 	}
+	lines = append(lines, "", "blast radius")
+	agents := "(none linked)"
 	if len(r.AffectedAgents) > 0 {
-		fmt.Fprintf(&b, "Blast radius — agents: %s\n", strings.Join(r.AffectedAgents, ", "))
-	} else {
-		b.WriteString("Blast radius — agents: (none linked)\n")
+		agents = strings.Join(r.AffectedAgents, ", ")
 	}
+	lines = append(lines, "  agents  "+agents)
 	if len(r.AffectedEvals) > 0 {
-		fmt.Fprintf(&b, "Blast radius — evals: %s\n", strings.Join(r.AffectedEvals, ", "))
+		lines = append(lines, "  evals   "+strings.Join(r.AffectedEvals, ", "))
 	}
 	if r.NeedsApproval {
-		fmt.Fprintf(&b, "NEEDS_APPROVAL: %s\n", strings.Join(r.ApprovalReasons, "; "))
+		lines = append(lines, "")
+		for _, reason := range r.ApprovalReasons {
+			lines = append(lines, "  "+reason)
+		}
 	}
-	return b.String()
+	return out.Frame("airlock", lines)
 }
 
-// FormatComment is the GitHub PR comment body.
-func FormatComment(r *Result) string {
-	if len(r.Changes) == 0 {
-		return "### Airlock\nNo AI artifact changes in this PR."
+func commentAlert(overall string, hasChanges bool) (kind, body string) {
+	switch overall {
+	case "FAIL":
+		return "CAUTION", "**FAIL** This PR failed the Airlock gate."
+	case "NEEDS_APPROVAL":
+		return "WARNING", "**NEEDS_APPROVAL** Merge stays blocked until this change is approved."
+	case "INCONCLUSIVE":
+		return "WARNING", "**INCONCLUSIVE** Eval evidence is thin. Raise samples or widen the gate."
+	default:
+		if !hasChanges {
+			return "NOTE", "**PASS** No AI artifact changes in this PR."
+		}
+		return "TIP", "**PASS** AI artifacts changed. Policy is green."
 	}
+}
+
+func commentGlyph(status string) string {
+	switch status {
+	case "added":
+		return "+"
+	case "removed":
+		return "-"
+	default:
+		return "~"
+	}
+}
+
+// FormatComment is the GitHub PR comment body. overall is PASS, FAIL,
+// NEEDS_APPROVAL, or INCONCLUSIVE. Empty overall is derived from the diff.
+func FormatComment(r *Result, overall string) string {
+	if overall == "" {
+		if r.NeedsApproval {
+			overall = "NEEDS_APPROVAL"
+		} else {
+			overall = "PASS"
+		}
+	}
+	alert, lead := commentAlert(overall, len(r.Changes) > 0)
 	var b strings.Builder
-	b.WriteString("### Airlock\n")
-	b.WriteString("This PR changes AI artifacts:\n")
-	for _, c := range r.Changes {
-		fmt.Fprintf(&b, "- `%s` **%s:%s**\n", c.Status, c.Kind, c.ID)
+	b.WriteString(CommentMarker + "\n")
+	b.WriteString("## Airlock\n\n")
+	fmt.Fprintf(&b, "> [!%s]\n> %s\n", alert, lead)
+	if len(r.Changes) == 0 {
+		return b.String()
 	}
+	agents := "none linked"
 	if len(r.AffectedAgents) > 0 {
-		fmt.Fprintf(&b, "\nBlast radius: agents **%s**\n", strings.Join(r.AffectedAgents, ", "))
+		agents = strings.Join(r.AffectedAgents, ", ")
 	}
+	evals := "none"
 	if len(r.AffectedEvals) > 0 {
-		fmt.Fprintf(&b, "\nBlast radius: evals **%s**\n", strings.Join(r.AffectedEvals, ", "))
+		evals = strings.Join(r.AffectedEvals, ", ")
+	}
+	b.WriteString("\n| gate | changes | agents | evals |\n|---|---:|---|---|\n")
+	fmt.Fprintf(&b, "| **%s** | %d | **%s** | **%s** |\n",
+		overall, len(r.Changes), agents, evals)
+
+	b.WriteString("\n### Changes\n\n")
+	b.WriteString("|  | kind | id |\n|:---:|---|---|\n")
+	for _, c := range r.Changes {
+		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` |\n", commentGlyph(c.Status), c.Kind, c.ID)
 	}
 	if r.NeedsApproval {
-		fmt.Fprintf(&b, "\n**NEEDS_APPROVAL:** %s\n", strings.Join(r.ApprovalReasons, "; "))
+		b.WriteString("\n### Why this is blocked\n\n")
+		for _, reason := range r.ApprovalReasons {
+			fmt.Fprintf(&b, "- %s\n", reason)
+		}
 	}
 	return b.String()
 }

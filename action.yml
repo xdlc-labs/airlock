@@ -4,14 +4,63 @@ description: Gate AI artifact changes on a pull request.
 runs:
   using: composite
   steps:
+    - id: resolve
+      shell: bash
+      env:
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        set -euo pipefail
+        echo "╭─ airlock ──────────────────────────────────────────╮"
+        echo "│  pull request gate                                 │"
+        echo "╰────────────────────────────────────────────────────╯"
+        echo "  1/5  resolve CLI"
+        echo "::group::1/5 Resolve CLI"
+        dest=/tmp/airlock
+        ref="${ACTION_REF:-}"
+        ref="${ref#refs/tags/}"
+        need_go=true
+        if [[ "$ref" == v[0-9]* ]]; then
+          os=$(uname -s | tr '[:upper:]' '[:lower:]')
+          arch=$(uname -m)
+          case "$arch" in
+            x86_64|amd64) arch=amd64 ;;
+            aarch64|arm64) arch=arm64 ;;
+            *) arch="" ;;
+          esac
+          if [ -n "$arch" ] && { [ "$os" = linux ] || [ "$os" = darwin ]; }; then
+            url="https://github.com/xdlc-labs/airlock/releases/download/${ref}/airlock_${ref#v}_${os}_${arch}.tar.gz"
+            tmp=$(mktemp -d)
+            if curl -fsSL "$url" -o "$tmp/airlock.tgz" && tar -xzf "$tmp/airlock.tgz" -C "$tmp" && [ -f "$tmp/airlock" ]; then
+              install -m 755 "$tmp/airlock" "$dest"
+              need_go=false
+              echo "  ok   release $ref"
+            else
+              echo "  skip release download, will build"
+            fi
+            rm -rf "$tmp"
+          fi
+        fi
+        if [ "$need_go" = true ]; then
+          echo "  ok   build from source"
+        fi
+        echo "need_go=${need_go}" >> "$GITHUB_OUTPUT"
+        echo "::endgroup::"
+
     - uses: actions/setup-go@v5
+      if: steps.resolve.outputs.need_go == 'true'
       with:
         go-version: "1.25.x"
         cache-dependency-path: ${{ github.action_path }}/go.sum
 
-    - shell: bash
+    - if: steps.resolve.outputs.need_go == 'true'
+      shell: bash
       working-directory: ${{ github.action_path }}
-      run: go build -o /tmp/airlock ./cmd/airlock
+      run: |
+        echo "  1/5  build CLI"
+        echo "::group::1/5 Build"
+        go build -o /tmp/airlock ./cmd/airlock
+        echo "  ok   $(/tmp/airlock version)"
+        echo "::endgroup::"
 
     - shell: bash
       env:
@@ -19,7 +68,9 @@ runs:
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         set -euo pipefail
-        git fetch origin "${GITHUB_BASE_REF:-HEAD}" 2>/dev/null || true
+        echo "  2/5  fetch refs"
+        echo "::group::2/5 Fetch refs"
+        git fetch -q origin "${GITHUB_BASE_REF:-HEAD}" 2>/dev/null || true
         if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
           BASE=$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)
           HEAD=${GITHUB_SHA}
@@ -27,22 +78,64 @@ runs:
           HEAD=$(git rev-parse HEAD)
           BASE=$(git rev-parse HEAD~1 2>/dev/null || echo "$HEAD")
         fi
+        echo "  base  ${BASE:0:12}"
+        echo "  head  ${HEAD:0:12}"
+        echo "::endgroup::"
+
         w=$(mktemp -d)
-        git worktree add --detach "$w/base" "$BASE"
-        git worktree add --detach "$w/head" "$HEAD"
+        cleanup() {
+          git worktree remove --force "$w/base" >/dev/null 2>&1 || true
+          git worktree remove --force "$w/head" >/dev/null 2>&1 || true
+        }
+        trap cleanup EXIT
+
+        echo "  3/5  snapshot merge-base"
+        echo "::group::3/5 Snapshot merge-base"
+        git worktree add -q --detach "$w/base" "$BASE"
         (cd "$w/base" && /tmp/airlock init && /tmp/airlock snapshot)
         id=$(basename "$(ls -t "$w/base/.airlock/snapshots/"*.json | head -1)" .json)
+        echo "  ok   $id"
+        echo "::endgroup::"
+
+        echo "  4/5  snapshot head"
+        echo "::group::4/5 Snapshot head"
+        git worktree add -q --detach "$w/head" "$HEAD"
         mkdir -p "$w/head/.airlock/snapshots"
         cp -a "$w/base/.airlock/snapshots/." "$w/head/.airlock/snapshots/"
         (cd "$w/head" && /tmp/airlock init && /tmp/airlock snapshot)
+        echo "  ok   head"
+        echo "::endgroup::"
+
+        echo "  5/5  gate"
+        echo "::group::5/5 Gate"
         set +e
-        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working --comment --fail-on-approval) | tee /tmp/airlock-comment.md
-        status=${PIPESTATUS[0]}
+        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working --fail-on-approval)
+        status=$?
         set -e
-        git worktree remove --force "$w/base" || true
-        git worktree remove --force "$w/head" || true
-        if [ -n "${PR_NUMBER:-}" ] && [ -f /tmp/airlock-comment.md ]; then
-          gh pr comment "$PR_NUMBER" --edit-last --body-file /tmp/airlock-comment.md \
-            || gh pr comment "$PR_NUMBER" --body-file /tmp/airlock-comment.md
+        echo "::endgroup::"
+
+        if [ -f "$w/head/.airlock/ci-comment.md" ]; then
+          cp "$w/head/.airlock/ci-comment.md" /tmp/airlock-comment.md
         fi
+
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f /tmp/airlock-comment.md ]; then
+          cat /tmp/airlock-comment.md >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        if [ -n "${PR_NUMBER:-}" ] && [ -f /tmp/airlock-comment.md ]; then
+          echo "::group::PR comment"
+          cid=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --paginate --jq '.[] | select(.body | contains("<!-- airlock-gate -->")) | .id' \
+            | head -1 || true)
+          if [ -n "$cid" ]; then
+            python3 -c 'import json,sys; print(json.dumps({"body": open(sys.argv[1], encoding="utf-8").read()}))' /tmp/airlock-comment.md \
+              | gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${cid}" --input -
+            echo "  ok   updated comment $cid"
+          else
+            gh pr comment "$PR_NUMBER" --body-file /tmp/airlock-comment.md
+            echo "  ok   posted comment"
+          fi
+          echo "::endgroup::"
+        fi
+
         exit "$status"

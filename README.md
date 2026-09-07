@@ -94,9 +94,17 @@ airlock init && airlock snapshot
 
 ```console
 $ airlock init && airlock snapshot
-Wrote .airlock/manifest.json
-  agents=1 models=1 prompts=2 tools=0 skills=1 mcp=2 evals=5
-snapshot abc123…  artifacts=12  manifest=def456…
+╭─ airlock init ───────────────────────────────╮
+│ agents  1     models  1     prompts  2      │
+│ tools   0     skills  1     mcp      2      │
+│ evals   5                                   │
+│                                             │
+│ wrote  .airlock/manifest.json               │
+╰──────────────────────────────────────────────╯
+╭─ snapshot ───────────────────────────────────╮
+│ abc123def456                                │
+│ artifacts  12    manifest  def456abc123     │
+╰──────────────────────────────────────────────╯
 ```
 
 Nudge the system prompt (or edit a skill / widen MCP permissions):
@@ -108,42 +116,77 @@ airlock snapshot && airlock diff
 
 ```console
 $ airlock snapshot && airlock diff
-snapshot ghi789…  artifacts=12  manifest=jkl012…
-
-Changed AI artifacts:
-  ~ prompt:system-prompt (a1b2c3d4 → e5f6a7b8)
-
-Blast radius - agents: support-bot
-Blast radius - evals:  default
+╭─ snapshot ───────────────────────────────────╮
+│ ghi789abc012                                │
+│ artifacts  12    manifest  jkl012mno345     │
+╰──────────────────────────────────────────────╯
+╭─ airlock ───────────────────────────────────────────────────╮
+│ base  abc123def456                                         │
+│ head  working                                              │
+│                                                            │
+│ changed                                                    │
+│   ~  prompt       system-prompt        a1b2c3d4 -> e5f6a7b8│
+│                                                            │
+│ blast radius                                               │
+│   agents  support-bot                                      │
+│   evals   default                                          │
+╰─────────────────────────────────────────────────────────────╯
 ```
 
-Run cheap replay evals and emit the PR body:
+Run cheap replay evals. `airlock ci` writes `.airlock/ci-comment.md` (human log stays on the terminal, not in that file):
 
 ```bash
 airlock test --mode replay
-airlock ci --comment
+airlock ci
 ```
 
 ```console
 $ airlock test --mode replay
-Verdict: PASS
-metric             rate             95% CI  gate
-task_success      100.0%  [ 47.8%, 100.0%]  PASS
-samples=9 cost=$0.0000  (cassette replay)
+╭─ eval ───────────────────────────────────────╮
+│ metric             rate            95% CI  gate │
+│ task_success      100.0%  [ 47.8%, 100.0%]  PASS │
+╰──────────────────────────────────────────────╯
+╭─ verdict ────────────────────────────────────╮
+│ PASS                                        │
+│ samples=9  cost=$0.0000  wrote  .airlock/results/latest.json │
+╰──────────────────────────────────────────────╯
 
-$ airlock ci --comment
+$ airlock ci
+╭─ airlock ───────────────────────────────────────────────────╮
+│ base  abc123def456                                         │
+│ head  working                                              │
+│                                                            │
+│ changed                                                    │
+│   ~  prompt       system-prompt        a1b2c3d4 -> e5f6a7b8│
+│                                                            │
+│ blast radius                                               │
+│   agents  support-bot                                      │
+│   evals   default                                          │
+╰─────────────────────────────────────────────────────────────╯
+╭─ verdict ────────────────────────────────────╮
+│ PASS                                        │
+│ wrote  .airlock/ci-comment.md               │
+╰──────────────────────────────────────────────╯
 ```
 
 ```markdown
-### Airlock
-This PR changes AI artifacts:
-- `changed` **prompt:system-prompt**
+<!-- airlock-gate -->
+## Airlock
 
-Blast radius: agents **support-bot**
+> [!TIP]
+> **PASS** AI artifacts changed. Policy is green.
 
-### Airlock eval
+| gate | changes | agents | evals |
+|---|---:|---|---|
+| **PASS** | 1 | **support-bot** | **default** |
 
-**Verdict: PASS**
+### Changes
+
+|  | kind | id |
+|:---:|---|---|
+| `~` | `prompt` | `system-prompt` |
+
+### Eval
 
 | metric | rate | 95% CI | gate | reason |
 |---|---:|---|---|---|
@@ -155,22 +198,32 @@ Flip the story - expand MCP power instead of a prompt:
 ```bash
 # e.g. add "write" under local-fs permissions in apm.lock.yaml
 airlock snapshot && airlock diff
-airlock ci --comment --fail-on-approval
+airlock ci --fail-on-approval
 ```
 
 ```console
 $ airlock diff
-Changed AI artifacts:
-  ~ mcp:local-fs (… → …)
-NEEDS_APPROVAL: MCP new permission write on local-fs
+╭─ airlock ───────────────────────────────────────────────────╮
+│ base  abc123def456                                         │
+│ head  working                                              │
+│                                                            │
+│ changed                                                    │
+│   ~  mcp          local-fs                                 │
+│                                                            │
+│ blast radius                                               │
+│   agents  support-bot                                      │
+│                                                            │
+│   MCP new permission write on local-fs                     │
+╰─────────────────────────────────────────────────────────────╯
 
-$ airlock ci --comment --fail-on-approval
-### Airlock
-…
-**NEEDS_APPROVAL:** MCP new permission write on local-fs
-
-Run `airlock approve --base … --head …` to unblock.
-exit 1   # merge blocked until approved
+$ airlock ci --fail-on-approval
+╭─ verdict ────────────────────────────────────╮
+│ NEEDS_APPROVAL                              │
+│ airlock approve --base ... --head working   │
+│ wrote  .airlock/ci-comment.md               │
+╰──────────────────────────────────────────────╯
+error: airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base ... --head ...)
+exit 1
 ```
 
 Flip it again - a prompt edit that quietly rides in with a new dependency (agent-driven supply chain):
@@ -183,16 +236,27 @@ airlock ci --base <baseline-snapshot-id> --fail-on-approval
 
 ```console
 $ airlock diff --base aaee8c11172c86b1
-Changed AI artifacts:
-  + dependency:left-pad
-  ~ prompt:system-prompt (a68e98e0 → 31125b19)
-Blast radius - agents: support-bot
-NEEDS_APPROVAL: new dependency: left-pad
+╭─ airlock ───────────────────────────────────────────────────╮
+│ base  aaee8c11172c86b1                                     │
+│ head  working                                              │
+│                                                            │
+│ changed                                                    │
+│   +  dependency   left-pad                                 │
+│   ~  prompt       system-prompt        a68e98e0 -> 31125b19│
+│                                                            │
+│ blast radius                                               │
+│   agents  support-bot                                      │
+│                                                            │
+│   new dependency: left-pad                                 │
+╰─────────────────────────────────────────────────────────────╯
 
 $ airlock ci --base aaee8c11172c86b1 --fail-on-approval
-…
-airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base … --head …)
-exit 1   # merge blocked until: airlock approve --base … --head …
+╭─ verdict ────────────────────────────────────╮
+│ NEEDS_APPROVAL                              │
+│ airlock approve --base aaee8c11172c86b1 --head working │
+╰──────────────────────────────────────────────╯
+error: airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base ... --head ...)
+exit 1
 ```
 
 A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc-labs.github.io/documentation/airlock/roadmap/#agent-driven-supply-chain).
@@ -220,7 +284,7 @@ jobs:
       - uses: xdlc-labs/airlock@v0.1.0-beta.8
 ```
 
-That is the whole install. The Action builds the CLI, diffs merge-base vs HEAD, and comments on the PR. Fail-closed on permission expansion by default.
+That is the whole install. On a version tag the Action downloads the CLI. `uses: ./` (this repo) builds from source. It diffs merge-base vs HEAD and comments on the PR. Fail-closed on permission expansion by default.
 
 Optional: `airlock init` and commit `.airlock/policy.yml` if you want custom gates. CI generates a stub when that file is missing.
 

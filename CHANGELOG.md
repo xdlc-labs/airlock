@@ -8,7 +8,13 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+
 ### Changed
+- Daily CLI commands (`init`, `snapshot`, `diff`, `test`, `ci`, `approve`) write boxed cards to stderr. Color is TTY-only. GitHub Actions gets `::notice::` / `::warning::` / `::error::` for the verdict.
+- `airlock ci --comment` no longer prints the PR body on stdout. `.airlock/ci-comment.md` is always written.
+- PR comments use GitHub alerts (`TIP` / `WARNING` / `CAUTION` / `NOTE`), a one-row summary table, and `+` / `~` / `-` change marks.
+- GitHub Action prints a numbered 1/5 setup trail, groups noisy steps, posts the comment file (update or create by marker), and copies that comment into the job summary. Downloads a release binary when the action ref is a `v*` tag.
+
 ### Fixed
 
 ## [0.1.0-beta.8] – 2026-09-07

@@ -116,7 +116,7 @@ func mustJSON(v any) []byte {
 
 // Summarize returns a one-line human summary.
 func Summarize(s *manifest.Snapshot) string {
-	return fmt.Sprintf("snapshot %s (%d artifacts, manifest %s)",
+	return fmt.Sprintf("snapshot  %s  artifacts=%d  manifest=%s",
 		s.ID, len(s.Artifacts), short(s.ManifestHash))
 }
 
