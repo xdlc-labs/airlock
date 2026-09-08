@@ -46,8 +46,8 @@ that needs a person. Reproduce it yourself with `bash docs/assets/demo.sh`.
 Linux and macOS, `amd64` and `arm64`. Windows is not supported yet.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.11 bash
-# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.11
+curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.12 bash
+# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.12
 ```
 
 This is a public beta, so every release is a pre-release and GitHub's "latest"
@@ -183,12 +183,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: xdlc-labs/airlock@v0.1.0-beta.11
+      - uses: xdlc-labs/airlock@v0
 ```
 
-That is the whole install. The Action diffs merge-base against HEAD, writes
-`.airlock/ci-comment.md`, and comments on the pull request. It fails closed on
-permission expansion by default.
+That is the whole install. `@v0` tracks the newest release, or pin an exact tag
+if you would rather move deliberately. The Action diffs merge-base against HEAD,
+writes `.airlock/ci-comment.md`, and comments on the pull request. It fails closed
+on permission expansion by default.
 
 `airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. Its
 default mins are strict on purpose: a `0.99` gate needs at least 381 clean samples

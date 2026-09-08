@@ -8,6 +8,27 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.1.0-beta.12] – 2026-09-08
+
+Fixes a gate that did not fire: widening an MCP server's `permissions:` was not
+detected, so `--fail-on-approval` let it through. Pin `uses: xdlc-labs/airlock@v0`
+or `@v0.1.0-beta.12`.
+
+### Highlights
+- MCP permission expansion is gated again. If you relied on it in an earlier beta, it was not gating.
+- The README walkthrough reaches a real `PASS` on a fresh clone.
+- An `INCONCLUSIVE` min gate now reports the sample count it would take to resolve.
+
+### Known limits
+- Windows install not supported yet
+- Comparative gates still report `SKIPPED` until a baseline exists
+
+### Added
 - `stats.SamplesToClearMin` reports the smallest sample count whose Wilson lower bound can reach a gate's `min`. An `INCONCLUSIVE` min gate now says how many clean samples it would take to resolve, so an unreachable threshold is visible instead of looking like a flaky run.
 - `docs/assets/demo.sh` regenerates the README demo recording from a clone.
 - The developer guide and roadmap live in `docs/` again, and `docs/assets/` carries the brand mark, so the README no longer depends on an external site.
@@ -177,7 +198,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.11...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...HEAD
+[0.1.0-beta.12]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.11...v0.1.0-beta.12
 [0.1.0-beta.11]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.10...v0.1.0-beta.11
 [0.1.0-beta.10]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.9...v0.1.0-beta.10
 [0.1.0-beta.9]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.8...v0.1.0-beta.9
