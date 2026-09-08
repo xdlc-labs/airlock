@@ -5,7 +5,7 @@
 # before a 95% Wilson interval can clear them, and this fixture has 3 eval
 # cases. At the default budget those gates can only ever report INCONCLUSIVE.
 # The mins below are reachable at 16 samples per case, so the walkthrough
-# reaches a real PASS in milliseconds against the replay cassettes.
+# reaches a real PASS in milliseconds against the mock provider.
 #
 # Copy the shape, not the numbers: pick mins your own sample budget can clear,
 # or raise max_samples_per_case to match the min you want.

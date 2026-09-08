@@ -1,8 +1,0 @@
-{
-  "id": "default",
-  "provider": "mock",
-  "model": "mock",
-  "rubric": "json_valid",
-  "pass_contains": "PASS",
-  "kappa_floor": 0.2
-}

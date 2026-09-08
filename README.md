@@ -35,10 +35,10 @@ fails, or holds the pull request for a human.
 
 That is the whole point in twelve seconds. The evals pass. The gate still blocks,
 because the blast radius includes a new `write` permission on an MCP server, and
-that needs a person. Reproduce it yourself with `bash docs/assets/demo.sh`.
+that needs a person. Walk through it below on the toy agent.
 
 - **Local-first.** State lives in `.airlock/` in your own repo. Nothing uploads.
-- **No API keys to try it.** The toy agent replays recorded provider traffic.
+- **No API keys to try it.** The toy agent uses a mock provider.
 - **Beside your eval platform, not instead of it.** Keep LangSmith or Promptfoo.
 
 ## Install
@@ -57,7 +57,7 @@ link skips them. Pin the tag above, or pick one from
 ## Break a prompt, watch Airlock catch it
 
 Clone this repository. The toy agent in `testdata/toy-agent` ships prompts, a
-skill, two MCP servers, eval cases, and replay cassettes.
+skill, one MCP server, and eval cases.
 
 ```bash
 cd testdata/toy-agent
@@ -68,13 +68,13 @@ airlock init && airlock snapshot
 ╭─ airlock init ───────────────────────────────╮
 │ agents  1     models  1     prompts  2       │
 │ tools   0     skills  1     mcp      2       │
-│ evals   5                                    │
+│ evals   2                                    │
 │                                              │
 │ wrote  .airlock/manifest.json                │
 ╰──────────────────────────────────────────────╯
 ╭─ snapshot ───────────────────────────────────╮
-│ ef161e3ddcfcc893                             │
-│ artifacts  13    manifest  6147318f7acc      │
+│ dca3ae3e3db0bd58                             │
+│ artifacts  10    manifest  1ed9ab1f53b8      │
 ╰──────────────────────────────────────────────╯
 ```
 
@@ -87,8 +87,8 @@ airlock diff
 
 ```console
 ╭─ airlock ───────────────────────────────────────────────────╮
-│ base  ef161e3ddcfcc893                                      │
-│ head  working-296121e6ab2e                                  │
+│ base  dca3ae3e3db0bd58                                      │
+│ head  working-f78985673552                                  │
 │                                                             │
 │ changed                                                     │
 │   ~  env          toy-env              04c19f51 -> 9fca1701 │
@@ -103,7 +103,7 @@ airlock diff
 *before* you make the change. The toy agent's `env.json` bundles that prompt into
 an environment artifact, which is why two artifacts move for one edit.
 
-Then run the evals against recorded traffic:
+Then run the evals against the mock provider:
 
 ```bash
 airlock test --mode replay
@@ -139,8 +139,8 @@ airlock ci --fail-on-approval
 
 ```console
 ╭─ airlock ───────────────────────────────────────────────────╮
-│ base  ef161e3ddcfcc893                                      │
-│ head  working-d9681ff95c40                                  │
+│ base  dca3ae3e3db0bd58                                      │
+│ head  working-71cd85c12f4e                                  │
 │                                                             │
 │ changed                                                     │
 │   ~  mcp          local-fs             e1156c01 -> 05e044b6 │
@@ -153,7 +153,7 @@ airlock ci --fail-on-approval
 ╰─────────────────────────────────────────────────────────────╯
 ╭─ verdict ───────────────────────────────────────────────────────────╮
 │ NEEDS_APPROVAL                                                      │
-│ airlock approve --base ef161e3ddcfcc893 --head working-d9681ff95c40 │
+│ airlock approve --base dca3ae3e3db0bd58 --head working-71cd85c12f4e │
 │ wrote  .airlock/ci-comment.md                                       │
 ╰─────────────────────────────────────────────────────────────────────╯
 error: airlock ci: NEEDS_APPROVAL without ledger entry
@@ -165,7 +165,7 @@ its `tools/list` all take the same path. `airlock approve` records the decision 
 a ledger so the next run knows a human said yes.
 
 The full walkthrough, including `--mode live`, judges, drift, and the production
-loop, is in the [developer guide](docs/GUIDE.md).
+loop, is in the [developer guide](https://xdlc.dev/airlock/docs/guide).
 
 ## Use it on your repo
 
@@ -214,7 +214,7 @@ That last row is the narrow claim worth being precise about: a dependency bump o
 its own is Dependabot's job and Airlock stays quiet. It speaks up when an
 AI-artifact change and a new dependency arrive in the same pull request, which is
 what an agent proposing its own tools looks like. Details in the
-[roadmap](docs/ROADMAP.md#agent-driven-supply-chain).
+[roadmap](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
 
 ## If you already use LangSmith, Braintrust, Langfuse, or Phoenix
 
@@ -224,7 +224,7 @@ for you. Point Airlock at eval cases you already trust with
 `airlock import promptfoo|langsmith|braintrust`, feed production signal through
 `airlock ingest otel`, and leave your traces where they are. There is no native
 connector yet, and no hosted dashboard here at all. See the
-[roadmap](docs/ROADMAP.md#langsmith--braintrust--langfuse--phoenix).
+[roadmap](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
 
 ## What is in the box
 
@@ -240,16 +240,16 @@ read-only local UI.
 Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
 files, Promptfoo suites, `go.sum`, `package-lock.json`, `Cargo.lock`, and
 heuristics for the OpenAI SDK and LangGraph. It is not every framework yet. The
-[guide](docs/GUIDE.md#what-init-discovers-today) lists exactly what is and is not
-detected today, and the [roadmap](docs/ROADMAP.md) covers the rest.
+[guide](https://xdlc.dev/airlock/docs/guide#what-init-discovers-today) lists exactly what is and is not
+detected today, and the [roadmap](https://xdlc.dev/airlock/docs/roadmap) covers the rest.
 
 ## Status
 
 Public beta. Expect discovery gaps and CLI churn before 1.0. No telemetry, no
 hosted control plane, nothing uploads by default.
 
-[Guide](docs/GUIDE.md) ·
-[Roadmap](docs/ROADMAP.md) ·
+[Guide](https://xdlc.dev/airlock/docs/guide) ·
+[Roadmap](https://xdlc.dev/airlock/docs/roadmap) ·
 [Changelog](CHANGELOG.md) ·
 [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) ·
