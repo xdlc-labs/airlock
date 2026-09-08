@@ -1,4 +1,0 @@
-{"input":"order status","output":"{\"ok\":true}","label":true}
-{"input":"refund","output":"{\"ok\":true}","label":true}
-{"input":"hack","output":"not-json","label":false}
-{"input":"leak","output":"also-bad","label":false}

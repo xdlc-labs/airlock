@@ -1,5 +1,0 @@
-{"name":"chat","attributes":{"gen_ai.request.model":"mock","gen_ai.prompt":"lookup order for user@example.com","airlock.agent":"support-bot"},"success":true}
-{"name":"chat","attributes":{"gen_ai.request.model":"mock","gen_ai.prompt":"ping","airlock.agent":"support-bot"},"success":true}
-{"name":"chat","attributes":{"gen_ai.request.model":"mock","gen_ai.prompt":"fail case","airlock.agent":"support-bot"},"success":false}
-{"name":"chat","attributes":{"gen_ai.request.model":"mock","gen_ai.prompt":"another ok","airlock.agent":"support-bot"},"success":true}
-{"name":"chat","attributes":{"gen_ai.request.model":"mock","gen_ai.prompt":"api_key=sk-abcdefghijklmnopqrstuvwxyz","airlock.agent":"support-bot"},"success":true}

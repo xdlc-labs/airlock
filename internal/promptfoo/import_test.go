@@ -7,7 +7,28 @@ import (
 )
 
 func TestImportFixture(t *testing.T) {
-	path := filepath.Join("..", "..", "testdata", "toy-agent", "promptfoo.yaml")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "promptfoo.yaml")
+	if err := os.WriteFile(path, []byte(`
+prompts:
+  - "Say hello"
+providers:
+  - mock
+tests:
+  - description: hello-json
+    vars:
+      query: "ping"
+    assert:
+      - type: is-json
+  - description: hello-contains
+    vars:
+      query: "exact:{\"ok\":true,\"answer\":\"mock\"}"
+    assert:
+      - type: contains
+        value: "ok"
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	res, err := ImportFile(path)
 	if err != nil {
 		t.Fatal(err)

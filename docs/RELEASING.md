@@ -60,5 +60,5 @@ Actions → **Release** → **Run workflow** → optional `tag` input. Prefer a 
 
 - Do not attach hand-built binaries that skip `-ldflags "-X main.version=…"`.
 - Do not use tags without a `v` prefix — `install.sh` and the workflow both expect `v*`.
-- Do not spray the new version across GUIDE / SUPPORT / SECURITY — link [CHANGELOG](../CHANGELOG.md) instead.
+- Do not spray the new version across SUPPORT / SECURITY. Link [CHANGELOG](../CHANGELOG.md) instead.
 - Do not ship with an empty or “Unreleased-only” changelog — betas need readable Release notes.

@@ -10,7 +10,7 @@ By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 1. Search existing issues.
 2. Reproduce on latest `main` with `go test ./...` / a minimal CLI repro.
-3. For security issues, follow [SECURITY.md](SECURITY.md) — never file publicly.
+3. For security issues, follow [SECURITY.md](SECURITY.md). Never file those publicly.
 
 ## Development setup
 
@@ -47,12 +47,12 @@ Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `vX.Y.Z` on `main` 
 
 | Good fits | Usually out of scope (open an issue first) |
 |-----------|--------------------------------------------|
-| Bug fixes, docs, fixtures | Cloud control plane / SSO (Phase 5–6) |
-| Eval / policy / stats improvements | Release agent / autonomic rollback (Phase 7) |
+| Bug fixes, docs, fixtures | Hosted control plane / SSO |
+| Eval / policy / stats improvements | Autonomic rollback agent |
 | Discovery: skills, Cursor rules, APM / Promptfoo / OTel | Competing with APM install-time features |
-| CI gate / approval hardening | Every framework plugin at once; unit-test selection for app CI |
+| CI gate / approval hardening | Every framework plugin at once, unit-test selection for app CI |
 
-Airlock **imports** APM lockfiles; it does not re-implement APM resolution. Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
+Airlock **imports** APM lockfiles. It does not re-implement APM resolution. Roadmap: [xdlc.dev/airlock/docs/roadmap](https://xdlc.dev/airlock/docs/roadmap).
 
 ## License
 
