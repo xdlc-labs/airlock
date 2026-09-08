@@ -28,6 +28,6 @@ You should get an acknowledgement within a few days. Please give a reasonable wi
 - **Local-first:** the OSS binary does not upload traces or eval data.
 - **Redaction:** `ingest` / `baseline` run local regex redaction before writing under `.airlock/`.
 - **Trust boundary:** treat `.airlock/` contents and eval fixtures as sensitive if they came from production.
-- **Approvals:** `NEEDS_APPROVAL` + the local approval ledger are advisory unless CI uses `--fail-on-approval` (sample app workflow defaults that flag on). Skill and MCP expansions both raise approval.
+- **Approvals:** `NEEDS_APPROVAL` + the local approval ledger are advisory unless CI uses `--fail-on-approval`. The GitHub Action passes that flag. Skill and MCP expansions both raise approval.
 
 Known non-goals for the OSS CLI: multi-tenant auth, remote policy sync, guaranteed GDPR tooling.

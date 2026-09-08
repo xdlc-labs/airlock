@@ -228,12 +228,14 @@ connector yet, and no hosted dashboard here at all. See the
 
 ## What is in the box
 
-`init` and `snapshot` build a content-addressed record of the AI system. `diff`
-reports what moved and which agents it reaches. `test` and `ci` run statistical
-evals and decide. `approve` and `rollback` handle human gates and re-pinning a
-known-good release. `sentinel` fingerprints upstream models so you notice when a
-provider changes one under a stable name. `ingest otel`, `baseline`, and `drift`
-close the loop from production. `history --serve` gives you a read-only local UI.
+`init` and `snapshot` build a content-addressed record of the AI system. Snapshot
+ids stay stable across CI runs: `generated_at` and the absolute root path are not
+hashed. `diff` reports what moved and which agents it reaches. `test` and `ci` run
+statistical evals and decide. `approve` and `rollback` handle human gates and
+re-pinning a known-good release. `sentinel` fingerprints upstream models so you
+notice when a provider changes one under a stable name. `ingest otel`, `baseline`,
+and `drift` close the loop from production. `history --serve` gives you a
+read-only local UI.
 
 Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
 files, Promptfoo suites, `go.sum`, `package-lock.json`, `Cargo.lock`, and

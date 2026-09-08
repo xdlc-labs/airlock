@@ -10,6 +10,7 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ### Added
 
 ### Changed
+- Docs: app repos use `uses: xdlc-labs/airlock@v0`. The in-repo workflow is dogfood (`uses: ./`), not a file to copy. Snapshot ids are described as stable. `airlock ci` always writes the comment file, so `--comment` is not part of the walkthrough.
 
 ### Fixed
 

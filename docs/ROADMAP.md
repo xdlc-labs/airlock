@@ -45,7 +45,7 @@ Prove the OSS gate in real CI first. Build the control plane around data those t
 
 | Layer | Status |
 |-------|--------|
-| OSS AI release gate | Mostly here. Phase 0–4 shipped as a local-first Go CLI plus a sample Action |
+| OSS AI release gate | Mostly here. Phase 0–4 shipped as a local-first Go CLI plus a reusable Action |
 | Team / enterprise control plane | Not built. Phase 5–6 |
 | Release agent (investigate → recommend rollback → open PR) | Not started. Phase 7; only after the gate is trusted |
 
@@ -107,7 +107,7 @@ edit agent artifacts
 
 ## Shipped (OSS beta)
 
-Local-first Go CLI plus a sample GitHub Action. State under `.airlock/`. No telemetry by default. Apache-2.0.
+Local-first Go CLI plus a reusable GitHub Action. State under `.airlock/`. No telemetry by default. Apache-2.0.
 
 - **AI manifest** — agents, models, prompts, tools, skills, MCP, judges, evals (imports [APM](https://github.com/microsoft/apm) lockfiles)
 - **Snapshot / diff** — content-addressed release record + blast radius
@@ -116,7 +116,7 @@ Local-first Go CLI plus a sample GitHub Action. State under `.airlock/`. No tele
 - **Skills and MCP** — first-class `skill`; skill / MCP power expansion → approval path; adversarial preference when those change
 - **Promptfoo import**, cassette replay, judge calibrate (beta-thin where noted)
 - **OTel ingest → baseline / drift** — thin production loop
-- **Sample workflow** — [`.github/workflows/airlock.yml`](https://github.com/xdlc-labs/airlock/blob/main/.github/workflows/airlock.yml)
+- **GitHub Action** — `uses: xdlc-labs/airlock@v0` ([README — Use it](../README.md#use-it-on-your-repo)). This repo dogfoods `uses: ./`.
 - **Agent-driven supply chain** — APM package dependencies tracked as `manifest.Dependency`. A new dependency landing with an AI-artifact change (prompt / skill / MCP / agent) raises `NEEDS_APPROVAL`. A dependency-only PR is left to SCA
 - **Model Sentinel** — `airlock sentinel probe|check`; silent provider drift when the config string did not change
 - **Stack scanner** — OpenAI SDK + LangGraph heuristics; live MCP `tools/list` for HTTP(S) at scan time
@@ -221,7 +221,7 @@ Keep them for traces, online evals, datasets, playground, annotation.
 
 1. Observe and curate in that platform.
 2. In the app repo: `airlock init`, import or point at eval cases you trust (`import promptfoo` or JSONL).
-3. Commit `.airlock/policy.yml`; add the [sample Action](https://github.com/xdlc-labs/airlock/blob/main/.github/workflows/airlock.yml); fail closed as needed.
+3. Commit `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@v0` ([README — Use it](../README.md#use-it-on-your-repo)). The Action fail-closes on approval.
 4. Optional: `ingest otel` → baseline / drift (file / JSONL path — not a live LangSmith API sync yet).
 
 **Later (Phase 5):** review queues that feed the gate — still no Airlock-hosted trace UI.

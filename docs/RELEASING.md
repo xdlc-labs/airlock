@@ -13,7 +13,7 @@ Version history for users: [CHANGELOG.md](../CHANGELOG.md). The **only** doc tha
    - Move items from **Unreleased** under the new version heading (`Added` / `Changed` / `Fixed`).
    - For prereleases, keep a short **Highlights** + **Known limits** block when useful.
    - Update compare links at the bottom of `CHANGELOG.md`.
-3. Update the install pin in [README.md](../README.md) (`AIRLOCK_VERSION=…` / `go install @…` / `uses: xdlc-labs/airlock@…`) — nowhere else.
+3. Update the install pin in [README.md](../README.md) (`AIRLOCK_VERSION=…` / `go install @…`) — nowhere else. Leave `uses: xdlc-labs/airlock@v0` unless you are moving the major tag.
 4. Tag and push (must start with `v`):
 
 ```bash
@@ -24,7 +24,7 @@ git push origin vX.Y.Z
 ```
 
 5. Watch **Release** workflow (`.github/workflows/release.yml`). It builds linux/darwin × amd64/arm64, attaches tarballs + sha256, creates the GitHub Release (pre-release if the tag contains `beta` / `rc` / `alpha`). The workflow cannot list the Action on GitHub Marketplace.
-6. Marketplace (org owner, 2FA, browser only). Edit the new release. Accept the GitHub Marketplace Developer Agreement if the checkbox is disabled. Tick **Publish this Action to the GitHub Marketplace**. Primary category: Continuous integration. Optional second: Code quality. Click **Update release**. Listing URL is derived from `action.yml` `name` (spaces become hyphens). Current `name:` is `Airlock AI release gate` (`/marketplace/actions/airlock-ai-release-gate`). `uses:` stays `xdlc-labs/airlock@<tag>`. Do not set `name:` to `Airlock`. That login is taken by [github.com/airlock](https://github.com/airlock), and GitHub refuses the listing.
+6. Marketplace (org owner, 2FA, browser only). Edit the new release. Accept the GitHub Marketplace Developer Agreement if the checkbox is disabled. Tick **Publish this Action to the GitHub Marketplace**. Primary category: Continuous integration. Optional second: Code quality. Click **Update release**. Listing URL is derived from `action.yml` `name` (spaces become hyphens). Current `name:` is `Airlock AI release gate` (`/marketplace/actions/airlock-ai-release-gate`). App repos pin `uses: xdlc-labs/airlock@v0`, or an exact tag. Do not set `name:` to `Airlock`. That login is taken by [github.com/airlock](https://github.com/airlock), and GitHub refuses the listing.
 7. Smoke:
 
 ```bash

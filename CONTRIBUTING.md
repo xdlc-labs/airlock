@@ -41,7 +41,7 @@ go build -o airlock ./cmd/airlock
 
 ## Releases
 
-Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `v*` on `main` → Release workflow publishes binaries for `install.sh`.
+Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `vX.Y.Z` on `main` (pattern `v*.*.*`, so the moving `v0` tag does not publish a release) → Release workflow publishes binaries for `install.sh`.
 
 ## Scope guidance
 

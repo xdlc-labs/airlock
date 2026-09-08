@@ -61,10 +61,12 @@ From the Airlock repository, after install or `go build -o airlock ./cmd/airlock
 cd testdata/toy-agent
 airlock init && airlock snapshot
 # edit a file under prompts/
-airlock snapshot && airlock diff
+airlock diff
 airlock test --mode replay
-airlock ci --comment
+airlock ci
 ```
+
+`diff` compares the working tree against the last snapshot, so take the snapshot *before* you edit. Snapshot ids are stable across machines and CI runs: `generated_at` and the absolute root path are not hashed.
 
 ## Install
 
@@ -102,13 +104,13 @@ airlock test --adversarial          # injection / jailbreak-style suite
 
 airlock import promptfoo promptfoo.yaml
 
-airlock ci --comment                # markdown for PR bodies
+airlock ci                          # always writes .airlock/ci-comment.md
 airlock ci --fail-on-eval
 airlock ci --fail-on-inconclusive   # also fail when a gate cannot resolve PASS/FAIL
 airlock ci --fail-on-approval       # block until approve on permission / skill expansion
 ```
 
-Copy [`.github/workflows/airlock.yml`](https://github.com/xdlc-labs/airlock/blob/main/.github/workflows/airlock.yml) into the **application** repo, not the Airlock source repo. The sample defaults to fail-on-approval (`AIRLOCK_FAIL_ON_APPROVAL`, default `true`).
+In an application repo, add `uses: xdlc-labs/airlock@v0` as in [README — Use it](../README.md#use-it-on-your-repo). Do not copy [`.github/workflows/airlock.yml`](https://github.com/xdlc-labs/airlock/blob/main/.github/workflows/airlock.yml). That file is this repo dogfooding `uses: ./`. The Action fail-closes on approval.
 
 ### Security in CI
 
@@ -129,6 +131,8 @@ The gate tells you which. A Wilson lower bound for a flawless run is `n / (n + z
 airlock approve --base <snap> --head <snap>
 airlock rollback --to <good-snapshot-id>   # re-pin + routing_decision.json for gateways
 ```
+
+Use the snapshot ids from the last `ci` comment. They stay valid on the next run because the id ignores `generated_at` and the absolute root path. Locally, `approve` records the decision so the next `ci --fail-on-approval` can pass. The GitHub Action fail-closes on the same gate. There is no hosted review UI.
 
 ### Production loop
 
@@ -165,9 +169,9 @@ This is the company case: MCP permission expansion must hit a human gate.
 From `testdata/toy-agent`, after `airlock init && airlock snapshot`:
 
 1. Widen MCP permissions in `apm.lock.yaml` (for example add `write` under `local-fs.permissions`). For an HTTP(S) server, the live `tools/list` fetch diffs tool names directly, so a new tool on the server fires even when nobody maintains `permissions:`.
-2. `airlock snapshot && airlock diff` — expect `NEEDS_APPROVAL` / MCP permission (or new-tool) reasons.
-3. `airlock ci --comment --fail-on-approval` — non-zero exit until approved.
-4. `airlock approve --base <base-snap> --head <head-snap>`, then re-run `ci` (or merge after the ledger records approval).
+2. `airlock diff` — expect `NEEDS_APPROVAL` / MCP permission (or new-tool) reasons.
+3. `airlock ci --fail-on-approval` — non-zero exit until approved. Writes `.airlock/ci-comment.md`.
+4. `airlock approve --base <base-snap> --head <head-snap>`, then re-run `ci`.
 
 Optional: `airlock test --adversarial`. `ci` with MCP or a skill touched auto-prefers injection cases when the suite exists.
 
