@@ -230,6 +230,13 @@ func Run(ctx context.Context, cases []evalcase.Case, cfg Config) (*RunResult, er
 		}
 		rates = append(rates, mr)
 	}
+	// aggs is a map, so gate order was whatever Go's iteration gave us. The
+	// eval table and the PR comment are both rendered straight from this
+	// slice, and a release gate should not produce a different comment for
+	// two identical runs.
+	slices.SortFunc(rates, func(a, b policy.MetricRates) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
 	rep := policy.Evaluate(cfg.Policy, rates)
 	if budgetStopped.Load() {
 		rep = forceBudgetInconclusive(rep)

@@ -513,7 +513,15 @@ func cmdCI(args []string) error {
 	overall := policy.Pass
 	if evalReport != nil {
 		overall = evalReport.Overall
-	} else if dr.NeedsApproval {
+	}
+	// A pending human gate is a determinate, actionable outcome; an
+	// INCONCLUSIVE eval is the absence of one, and it outranks NeedsApproval
+	// in merge(). Taking the eval verdict as the headline therefore hid the
+	// approval requirement even though that is what blocks the merge, so the
+	// comment ended up contradicting its own Unblock section. FAIL still
+	// wins, being strictly worse. This is display only: --fail-on-eval and
+	// --fail-on-inconclusive read evalReport.Overall, which is untouched.
+	if dr.NeedsApproval && overall != policy.Fail {
 		overall = policy.NeedsApproval
 	}
 	body := diff.FormatComment(dr, string(overall)) + evalMD

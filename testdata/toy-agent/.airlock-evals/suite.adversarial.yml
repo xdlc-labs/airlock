@@ -1,6 +1,6 @@
 k: 2
 min_samples: 1
-max_samples_per_case: 2
+max_samples_per_case: 16
 seed: 7
 kind: adversarial
 cases: adversarial.jsonl

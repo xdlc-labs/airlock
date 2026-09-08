@@ -3,6 +3,8 @@ package policy
 import (
 	"fmt"
 	"os"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/xdlc-labs/airlock/internal/stats"
 	"gopkg.in/yaml.v3"
@@ -150,6 +152,12 @@ func Evaluate(p Policy, metrics []MetricRates) Report {
 			default:
 				ev.Verdict = Inconclusive
 				ev.Reason = fmt.Sprintf("CI [%.4f, %.4f] straddles min %.4f", ci.Low, ci.High, *spec.Min)
+				// Without this, a gate whose min is unreachable at the current
+				// sample budget just reports INCONCLUSIVE every run with no
+				// hint that no amount of retrying will settle it.
+				if need := stats.SamplesToClearMin(*spec.Min, level); need > m.N {
+					ev.Reason += fmt.Sprintf("; a flawless run needs >= %d samples to clear this min, have %d", need, m.N)
+				}
 			}
 		}
 
@@ -221,16 +229,59 @@ func merge(a, b VerdictKind) VerdictKind {
 	return a
 }
 
+// reasonWrap is the column budget for a gate's reason text. Reasons carry
+// remediation hints and can run long; the surrounding box grows to its widest
+// line, so an unwrapped reason pushed the eval table past 160 columns and broke
+// it in an ordinary terminal.
+const reasonWrap = 62
+
 func FormatTable(r Report) string {
 	if len(r.Metrics) == 0 {
 		return ""
 	}
 	s := fmt.Sprintf("%-16s %8s %18s  %s\n", "metric", "rate", "95% CI", "gate")
 	for _, m := range r.Metrics {
-		s += fmt.Sprintf("%-16s %6.1f%%  [%5.1f%%, %5.1f%%]  %s  %s\n",
-			m.Name, m.CI.Estimate*100, m.CI.Low*100, m.CI.High*100, m.Verdict, m.Reason)
+		// A SKIPPED gate never ran, so it has no rate. Printing its zero value
+		// rendered as "0.0% [0.0%, 0.0%]", which reads like a total failure
+		// rather than a gate awaiting a baseline.
+		if m.Verdict == Skipped {
+			s += fmt.Sprintf("%-16s %8s %18s  %s\n", m.Name, "-", "-", m.Verdict)
+		} else {
+			s += fmt.Sprintf("%-16s %6.1f%%  [%5.1f%%, %5.1f%%]  %s\n",
+				m.Name, m.CI.Estimate*100, m.CI.Low*100, m.CI.High*100, m.Verdict)
+		}
+		for _, ln := range wrapWords(m.Reason, reasonWrap) {
+			s += "    " + ln + "\n"
+		}
 	}
 	return s
+}
+
+// wrapWords greedily wraps on spaces, measuring in runes so that multi-byte
+// characters do not throw off the enclosing box's padding. A single word longer
+// than the budget is left intact rather than split, so hashes and flags stay
+// copy-pasteable.
+func wrapWords(text string, width int) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+	var (
+		lines []string
+		cur   string
+	)
+	for _, w := range words {
+		switch {
+		case cur == "":
+			cur = w
+		case utf8.RuneCountInString(cur)+1+utf8.RuneCountInString(w) <= width:
+			cur += " " + w
+		default:
+			lines = append(lines, cur)
+			cur = w
+		}
+	}
+	return append(lines, cur)
 }
 
 func FormatMarkdown(r Report) string {
@@ -240,6 +291,10 @@ func FormatMarkdown(r Report) string {
 	s := "\n### Eval\n\n"
 	s += "| metric | rate | 95% CI | gate | reason |\n|---|---:|---|---|---|\n"
 	for _, m := range r.Metrics {
+		if m.Verdict == Skipped {
+			s += fmt.Sprintf("| `%s` | - | - | **%s** | %s |\n", m.Name, m.Verdict, m.Reason)
+			continue
+		}
 		s += fmt.Sprintf("| `%s` | %.1f%% | [%.1f%%, %.1f%%] | **%s** | %s |\n",
 			m.Name, m.CI.Estimate*100, m.CI.Low*100, m.CI.High*100, m.Verdict, m.Reason)
 	}
