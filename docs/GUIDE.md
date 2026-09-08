@@ -68,12 +68,14 @@ airlock ci --comment
 
 ## Install
 
-Pin a pre-release tag from [Releases](https://github.com/xdlc-labs/airlock/releases), or copy the command from [README — Install](../README.md#install). GitHub “latest” skips pre-releases.
+Pin a pre-release tag from [Releases](https://github.com/xdlc-labs/airlock/releases), or copy the command from [README — Install](../README.md#install). Every release is still a pre-release, so GitHub “latest” skips them all and you have to name a tag.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=<tag> bash
 # or: go install github.com/xdlc-labs/airlock/cmd/airlock@<tag>   # Go 1.25+
 ```
+
+The Action is the exception. `uses: xdlc-labs/airlock@v0` follows a moving major tag, so a workflow picks up each release without being edited, and the Action resolves that tag to the release binary rather than compiling from source. Pin an exact tag there instead if you would rather move deliberately.
 
 Maintainers cutting releases: [RELEASING.md](RELEASING.md).
 
@@ -119,6 +121,8 @@ Company default: `--fail-on-approval`, and usually `--fail-on-eval`. Approvals a
 
 `--fail-on-eval` only trips on a `FAIL` verdict. With default thresholds (`0.99` / `0.995` min) and `max_samples_per_case: 5`, a metric’s confidence interval can straddle the min forever — stuck `INCONCLUSIVE`, never `PASS` or `FAIL`, and CI stays green. Add `--fail-on-inconclusive` to fail closed on that too. Raise `max_samples_per_case` or widen the gate if you want it to resolve instead of sitting there.
 
+The gate tells you which. A Wilson lower bound for a flawless run is `n / (n + z²)`, so clearing a min takes at least `min · z² / (1 − min)` samples: 16 at `0.80`, 73 at `0.95`, **381** at `0.99`, 765 at `0.995`. An `INCONCLUSIVE` min gate prints the figure alongside what it actually had, so an unreachable threshold reads as unreachable instead of looking like a flaky run. [Why a 99% gate can never pass](blog/your-99-percent-eval-gate-can-never-pass.md) works through it.
+
 ### Approvals and rollback
 
 ```bash
@@ -143,7 +147,7 @@ airlock judge attribution
 
 ## Policy knobs
 
-Edit `.airlock/policy.yml` after `init`. Useful fields:
+Edit `.airlock/policy.yml` after `init`. `init` writes the stub only when that file is missing, so a policy you commit survives later runs — which is how `testdata/toy-agent` ships gates at a `0.80` min that its three eval cases can actually clear. Useful fields:
 
 - Gates with confidence intervals (`tool_success`, `json_valid`, `task_success`, `adversarial_critical`)
 - Budgets (`max_cost_per_pr`, `max_samples_per_case`)
