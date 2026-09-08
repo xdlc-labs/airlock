@@ -12,6 +12,7 @@ runs:
       shell: bash
       env:
         ACTION_REF: ${{ github.action_ref }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
         echo "╭─ airlock ──────────────────────────────────────────╮"
@@ -23,6 +24,24 @@ runs:
         ref="${ACTION_REF:-}"
         ref="${ref#refs/tags/}"
         need_go=true
+        # A major-only ref such as v0 is a moving tag, not the name of a
+        # release, so releases/download/v0/... does not exist. Resolve it to
+        # the release it currently points at, or every run pays for a Go build.
+        if [[ "$ref" =~ ^v[0-9]+$ ]]; then
+          api="https://api.github.com/repos/xdlc-labs/airlock/releases?per_page=50"
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            body=$(curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GITHUB_TOKEN}" "$api" || true)
+          else
+            body=$(curl -fsSL -H "Accept: application/vnd.github+json" "$api" || true)
+          fi
+          resolved=$(printf '%s' "$body" | jq -r --arg m "${ref}." '[.[] | select(.draft == false) | .tag_name | select(startswith($m))][0] // empty' 2>/dev/null || true)
+          if [ -n "$resolved" ]; then
+            echo "  ok   $ref -> $resolved"
+            ref="$resolved"
+          else
+            echo "  warn no release matches $ref, will build"
+          fi
+        fi
         if [[ "$ref" == v[0-9]* ]]; then
           os=$(uname -s | tr '[:upper:]' '[:lower:]')
           arch=$(uname -m)

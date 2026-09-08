@@ -13,6 +13,18 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 
 ### Fixed
 
+## [0.1.0-beta.13] – 2026-09-08
+
+Makes `uses: xdlc-labs/airlock@v0` use the release binary. Required if you follow
+the README, which now recommends the moving tag.
+
+### Fixed
+- The Action built its download URL straight from `github.action_ref`, so a
+  major-only ref asked for `releases/download/v0/airlock_0_<os>_<arch>.tar.gz`,
+  which is not a release name and never existed. Every `@v0` run 404'd and fell
+  back to compiling Go from source. A major-only ref now resolves to the release
+  it currently points at; an unmatched one still falls back to the source build.
+
 ## [0.1.0-beta.12] – 2026-09-08
 
 Fixes a gate that did not fire: widening an MCP server's `permissions:` was not
@@ -198,7 +210,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...HEAD
+[0.1.0-beta.13]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...v0.1.0-beta.13
 [0.1.0-beta.12]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.11...v0.1.0-beta.12
 [0.1.0-beta.11]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.10...v0.1.0-beta.11
 [0.1.0-beta.10]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.9...v0.1.0-beta.10

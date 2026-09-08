@@ -45,11 +45,12 @@ git tag -f v0 vX.Y.Z-beta.N
 git push -f origin v0
 ```
 
-`action.yml` resolves the CLI from `github.action_ref`, and its release-download
-branch only triggers on a `v[0-9]*` ref. `v0` matches, so the tag must point at a
-commit whose release assets exist — that is, an already-published release, not a
-branch head. Build-from-source is the fallback if a download 404s, so a stale
-`v0` degrades rather than breaking.
+`action.yml` resolves a major-only ref by asking the API for the newest release
+whose tag starts with it, so `v0` does not have to name a release itself — it only
+has to point at a commit whose `action.yml` carries that resolution step (anything
+from `v0.1.0-beta.13` on). Keep pointing it at a published release anyway, so what
+`@v0` runs is a version you actually shipped. Build-from-source stays the fallback
+when no release matches, so a stale `v0` degrades rather than breaking.
 
 ## Manual / dry-run
 
