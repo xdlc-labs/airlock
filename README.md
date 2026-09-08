@@ -17,47 +17,24 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
 </p>
 
----
-
-Your test suite checks that the code still works. It does not check that the agent
-still behaves. A prompt gets reworded, a skill lands, an MCP server picks up a
-`write` permission, a provider swaps the model behind a stable string, and every
-check stays green because no test asserts on any of it.
-
-Airlock is a release gate for that surface. It treats prompts, skills, tools, MCP
-servers, models, judges, and eval sets as one releasable unit, diffs what changed,
-evaluates behavior against policy with confidence intervals, and then passes,
-fails, or holds the pull request for a human.
-
 <p align="center">
   <img src="docs/assets/demo.gif" width="760" alt="Airlock blocking an MCP permission expansion in CI">
 </p>
 
-That is the whole point in twelve seconds. The evals pass. The gate still blocks,
-because the blast radius includes a new `write` permission on an MCP server, and
-that needs a person. Walk through it below on the toy agent.
-
-- **Local-first.** State lives in `.airlock/` in your own repo. Nothing uploads.
-- **No API keys to try it.** The toy agent uses a mock provider.
-- **Beside your eval platform, not instead of it.** Keep LangSmith or Promptfoo.
+Airlock diffs AI artifacts on a pull request, runs evals, and then passes, fails, or asks a human. State stays in `.airlock/` in your repo. Nothing uploads.
 
 ## Install
 
-Linux and macOS, `amd64` and `arm64`. Windows is not supported yet.
+Linux and macOS, `amd64` and `arm64`. Pin a pre-release tag. GitHub "latest" skips them.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.13 bash
 # or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.13
 ```
 
-This is a public beta, so every release is a pre-release and GitHub's "latest"
-link skips them. Pin the tag above, or pick one from
-[Releases](https://github.com/xdlc-labs/airlock/releases).
+## Try it
 
-## Break a prompt, watch Airlock catch it
-
-Clone this repository. The toy agent in `testdata/toy-agent` ships prompts, a
-skill, one MCP server, and eval cases.
+Clone this repository. The toy agent under `testdata/toy-agent` needs no API keys.
 
 ```bash
 cd testdata/toy-agent
@@ -78,7 +55,7 @@ airlock init && airlock snapshot
 ╰──────────────────────────────────────────────╯
 ```
 
-Now reword the system prompt and ask what it touches:
+Snapshot before you edit. Reword the system prompt and ask what it touches:
 
 ```bash
 echo "You are a DIFFERENT support agent." >> prompts/system.md
@@ -99,11 +76,7 @@ airlock diff
 ╰─────────────────────────────────────────────────────────────╯
 ```
 
-`diff` compares the working tree against the last snapshot, so take the snapshot
-*before* you make the change. The toy agent's `env.json` bundles that prompt into
-an environment artifact, which is why two artifacts move for one edit.
-
-Then run the evals against the mock provider:
+Two artifacts move because `env.json` bundles that prompt. Then run the evals:
 
 ```bash
 airlock test --mode replay
@@ -126,14 +99,12 @@ airlock test --mode replay
 ╰───────────────────────────────────────────────────────────────╯
 ```
 
-Gates fire on confidence intervals, never on a point estimate. A comparative gate
-with no baseline yet reports `SKIPPED` rather than inventing a verdict, and it
-never fails the build on its own.
+Gates fire on confidence intervals. A comparative gate with no baseline reports `SKIPPED` and does not fail the build on its own.
 
-Now the interesting one. Widen an MCP server's permissions instead:
+Widen MCP permissions instead:
 
 ```bash
-# add "write" under mcp.local-fs.permissions in apm.lock.yaml
+# add write under mcp.local-fs.permissions in apm.lock.yaml
 airlock ci --fail-on-approval
 ```
 
@@ -160,12 +131,7 @@ error: airlock ci: NEEDS_APPROVAL without ledger entry
 exit 1
 ```
 
-Adding a skill, widening a write tool, or a live MCP server growing a new tool in
-its `tools/list` all take the same path. `airlock approve` records the decision in
-a ledger so the next run knows a human said yes.
-
-The full walkthrough, including `--mode live`, judges, drift, and the production
-loop, is in the [developer guide](https://xdlc.dev/airlock/docs/guide).
+Evals can still pass. The gate blocks until a human runs `airlock approve`.
 
 ## Use it on your repo
 
@@ -186,68 +152,39 @@ jobs:
       - uses: xdlc-labs/airlock@v0
 ```
 
-That is the whole install. `@v0` tracks the newest release, or pin an exact tag
-if you would rather move deliberately. The Action diffs merge-base against HEAD,
-writes `.airlock/ci-comment.md`, and comments on the pull request. It fails closed
-on permission expansion by default.
+`@v0` tracks the newest release. Pin an exact tag if you want to move slower. The Action fail-closes on permission expansion.
 
-`airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. Its
-default mins are strict on purpose: a `0.99` gate needs at least 381 clean samples
-before a 95% interval can clear it, so if you leave the sample budget low that
-gate will report `INCONCLUSIVE` forever. Airlock now tells you the number it
-needs. Raise `max_samples_per_case`, lower the min, or add
-`--fail-on-inconclusive` so an undecided gate blocks instead of passing quietly.
+`airlock init` writes `.airlock/policy.yml` if it is missing. Default mins are strict. An undecided gate prints how many samples it needs. Lower the min, raise `max_samples_per_case`, or pass `--fail-on-inconclusive`.
 
-## What it gates, and what it does not
+## What it gates
 
-Airlock gates **AI release risk on the pull request**. It is not a general
-application security scanner.
+Airlock gates AI release risk on the pull request. It is not a general AppSec scanner.
 
 | Airlock blocks | Keep using |
 |---|---|
 | MCP, write-tool, and skill permission expansion (`--fail-on-approval`) | CodeQL and other SAST |
 | Eval regressions and undecided gates (`--fail-on-eval`, `--fail-on-inconclusive`) | Dependabot, Socket, `cargo-vet` |
-| PII or secrets appearing in model input and output (`data_boundary.fail_on_pii`) | Repository secret scanning |
-| A new dependency riding along with a prompt, skill, or MCP change | SCA on dependency-only pull requests |
+| PII or secrets in model input and output (`data_boundary.fail_on_pii`) | Repository secret scanning |
+| A new dependency landing with a prompt, skill, or MCP change | SCA on dependency-only pull requests |
 
-That last row is the narrow claim worth being precise about: a dependency bump on
-its own is Dependabot's job and Airlock stays quiet. It speaks up when an
-AI-artifact change and a new dependency arrive in the same pull request, which is
-what an agent proposing its own tools looks like. Details in the
-[roadmap](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
+A lockfile bump alone is Dependabot's job. Airlock speaks up when an AI-artifact change and a new dependency arrive together.
 
-## If you already use LangSmith, Braintrust, Langfuse, or Phoenix
+Keep LangSmith, Braintrust, Promptfoo, or Phoenix for traces and datasets. Import cases with `airlock import promptfoo|langsmith|braintrust`. Airlock is the ship-or-block decision on the PR.
 
-Keep them. They trace runs, hold datasets, and let you iterate on prompts in a UI.
-Airlock is the ship-or-block decision on the pull request, which none of them make
-for you. Point Airlock at eval cases you already trust with
-`airlock import promptfoo|langsmith|braintrust`, feed production signal through
-`airlock ingest otel`, and leave your traces where they are. There is no native
-connector yet, and no hosted dashboard here at all. See the
-[roadmap](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
+## Commands
 
-## What is in the box
+| Command | Job |
+|---|---|
+| `init` / `snapshot` | Discover artifacts, freeze a release record |
+| `diff` | What changed, which agents it reaches |
+| `test` / `ci` | Evals and the PR verdict |
+| `approve` / `rollback` | Human gate, re-pin a known-good snapshot |
+| `sentinel` | Fingerprint a model behind a stable name |
+| `ingest` / `baseline` / `drift` | Production loop from local OTel JSONL |
+| `import` / `eval` / `judge` | Bring in cases, promote, calibrate |
+| `history --serve` | Local read-only UI |
 
-`init` and `snapshot` build a content-addressed record of the AI system. Snapshot
-ids stay stable across CI runs: `generated_at` and the absolute root path are not
-hashed. `diff` reports what moved and which agents it reaches. `test` and `ci` run
-statistical evals and decide. `approve` and `rollback` handle human gates and
-re-pinning a known-good release. `sentinel` fingerprints upstream models so you
-notice when a provider changes one under a stable name. `ingest otel`, `baseline`,
-and `drift` close the loop from production. `history --serve` gives you a
-read-only local UI.
-
-Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
-files, Promptfoo suites, `go.sum`, `package-lock.json`, `pnpm-lock.yaml`,
-`yarn.lock`, `Cargo.lock`, `poetry.lock`, `Pipfile.lock`, `uv.lock`, and
-heuristics for the OpenAI SDK and LangGraph. It is not every framework yet. The
-[guide](https://xdlc.dev/airlock/docs/guide#what-init-discovers-today) lists exactly what is and is not
-detected today, and the [roadmap](https://xdlc.dev/airlock/docs/roadmap) covers the rest.
-
-## Status
-
-Public beta. Expect discovery gaps and CLI churn before 1.0. No telemetry, no
-hosted control plane, nothing uploads by default.
+Discovery covers APM lockfiles, skills, Cursor rules, MCP configs, prompts, Promptfoo, common lockfiles, and OpenAI SDK / LangGraph heuristics. The [guide](https://xdlc.dev/airlock/docs/guide#what-init-discovers) lists what is and is not detected.
 
 [Guide](https://xdlc.dev/airlock/docs/guide) ·
 [Roadmap](https://xdlc.dev/airlock/docs/roadmap) ·
