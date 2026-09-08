@@ -96,6 +96,24 @@ func BootstrapPairedDeltaCI(basePass, candPass []bool, level float64, B int, see
 	}
 }
 
+// SamplesToClearMin returns the smallest sample count whose Wilson lower bound
+// can reach minRate, assuming a flawless run. The Wilson lower bound for k==n
+// is n/(n+z^2), so a high min needs far more samples than people expect: a
+// 0.99 gate cannot resolve below ~381 samples no matter how clean the run is,
+// and under that it sits at INCONCLUSIVE forever. Any observed failure pushes
+// the real requirement higher, so treat this as a floor.
+func SamplesToClearMin(minRate, level float64) int {
+	if minRate <= 0 {
+		return 1
+	}
+	if minRate >= 1 {
+		return 0
+	}
+	z := zFor(level)
+	n := minRate * z * z / (1 - minRate)
+	return int(math.Ceil(n))
+}
+
 func PassesMin(ci Interval, minRate float64) bool {
 	return ci.Low >= minRate
 }

@@ -32,6 +32,25 @@ curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | 
 airlock version
 ```
 
+## Moving `v0` tag
+
+Every popular Action offers a major-version tag so users can write
+`uses: xdlc-labs/airlock@v0` and pick up patches without editing a workflow.
+Airlock only publishes pre-releases today, so GitHub's "latest" link skips them
+and a reader who copies from the Marketplace gets nothing. Move `v0` after each
+cut:
+
+```bash
+git tag -f v0 vX.Y.Z-beta.N
+git push -f origin v0
+```
+
+`action.yml` resolves the CLI from `github.action_ref`, and its release-download
+branch only triggers on a `v[0-9]*` ref. `v0` matches, so the tag must point at a
+commit whose release assets exist — that is, an already-published release, not a
+branch head. Build-from-source is the fallback if a download 404s, so a stale
+`v0` degrades rather than breaking.
+
 ## Manual / dry-run
 
 Actions → **Release** → **Run workflow** → optional `tag` input. Prefer a real tag push for production cuts.

@@ -8,10 +8,20 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+- `stats.SamplesToClearMin` reports the smallest sample count whose Wilson lower bound can reach a gate's `min`. An `INCONCLUSIVE` min gate now says how many clean samples it would take to resolve, so an unreachable threshold is visible instead of looking like a flaky run.
+- `docs/assets/demo.sh` regenerates the README demo recording from a clone.
+- The developer guide and roadmap live in `docs/` again, and `docs/assets/` carries the brand mark, so the README no longer depends on an external site.
 
 ### Changed
+- Gate reasons wrap at a fixed column instead of stretching their box. A long reason used to push the eval table past 160 columns and break it in an ordinary terminal.
+- A `SKIPPED` gate prints `-` for rate and interval rather than `0.0%`, which read as a total failure rather than a gate awaiting a baseline.
+- Eval metrics are sorted by name. They came out of a map, so two identical runs could produce different PR comments.
+- `airlock ci` reports `NEEDS_APPROVAL` as the headline verdict when a human gate is pending, unless a gate outright failed. `INCONCLUSIVE` outranks `NEEDS_APPROVAL` internally, so the comment used to contradict its own Unblock section. Display only: `--fail-on-eval` and `--fail-on-inconclusive` still read the eval verdict.
+- The toy agent ships a committed `.airlock/policy.yml` and a larger sample budget, so the README walkthrough reaches a real `PASS`. The default mins that `init` writes cannot resolve at a three-case sample budget.
 
 ### Fixed
+- **MCP permission expansion was not gated.** An MCP server's artifact hash was its schema hash alone, and an APM lockfile usually pins that as a literal, so widening `permissions:` did not move it. Diff only inspects artifacts whose hash changed, so a permissions-only edit produced "no AI artifact changes" and sailed past `--fail-on-approval`. Permissions are now part of the artifact hash, sorted so reordering is not a change.
+- Box padding counted bytes rather than runes, so any line holding a multi-byte character was over-padded and the right border came out ragged.
 
 ## [0.1.0-beta.11] – 2026-09-07
 

@@ -55,17 +55,21 @@ func FrameText(title, body string) string {
 	return Frame(title, strings.Split(body, "\n"))
 }
 
+// visibleLen counts printable columns, skipping ANSI escape sequences. It
+// counts runes rather than bytes: iterating bytes made every multi-byte
+// character (an em-dash in a gate reason, an accented prompt id) count two or
+// three columns, so Frame over-padded that row and the box's right border came
+// out ragged. Double-width glyphs such as CJK and emoji still count as one.
 func visibleLen(s string) int {
 	n := 0
 	esc := false
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == '\033' {
+	for _, r := range s {
+		if r == '\033' {
 			esc = true
 			continue
 		}
 		if esc {
-			if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') {
 				esc = false
 			}
 			continue

@@ -1,8 +1,9 @@
 # Docs
 
-Guides: **[xdlc.dev/airlock/docs](https://xdlc.dev/airlock/docs)**.
+- **[Developer guide](GUIDE.md)** — install, day-to-day commands, policy knobs, the MCP approval demo, and exactly what `init` discovers today.
+- **[Roadmap](ROADMAP.md)** — what shipped, what is next, integration playbooks, non-goals.
+- **[Releasing](RELEASING.md)** — how maintainers cut a release.
+- **[Blog](blog/)** — writing on release gating for AI systems.
 
-- [Developer guide](https://xdlc.dev/airlock/docs)
-- [Roadmap](https://xdlc.dev/airlock/docs/roadmap)
-
-How we cut a release stays in this repo: [RELEASING.md](RELEASING.md).
+Assets in [`assets/`](assets) back the README: `demo.gif` is generated from
+`demo.cast`, and [`demo.sh`](assets/demo.sh) regenerates both from a clone.

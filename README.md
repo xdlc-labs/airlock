@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://xdlc.dev/images/brand/mark.png" width="72" alt="xdlc-labs">
+  <img src="docs/assets/mark.png" width="72" alt="xdlc-labs">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>AI release engineering. CI gate for prompts, skills, MCP, and models.</strong>
+  <strong>Your coding agent widened its own MCP write access in a pull request.<br>Nothing in CI noticed.</strong>
 </p>
 
 <p align="center">
@@ -19,73 +19,45 @@
 
 ---
 
-GitHub Actions for safely shipping AI agents — CI release gate for prompts, skills, MCP, and models. Not another eval platform.
+Your test suite checks that the code still works. It does not check that the agent
+still behaves. A prompt gets reworded, a skill lands, an MCP server picks up a
+`write` permission, a provider swaps the model behind a stable string, and every
+check stays green because no test asserts on any of it.
 
-Airlock treats models, prompts, tools, skills, MCP servers, judges, and eval sets as a **releasable unit**, detects what changed, evaluates behavior against policy with **statistical confidence**, and **blocks or approves** the ship — including when the change came from upstream.
+Airlock is a release gate for that surface. It treats prompts, skills, tools, MCP
+servers, models, judges, and eval sets as one releasable unit, diffs what changed,
+evaluates behavior against policy with confidence intervals, and then passes,
+fails, or holds the pull request for a human.
 
-You run a local CLI and a GitHub Action. State stays under `.airlock/` in your app repo. Nothing uploads by default.
+<p align="center">
+  <img src="docs/assets/demo.gif" width="760" alt="Airlock blocking an MCP permission expansion in CI">
+</p>
 
-> First public beta · no telemetry · [Apache-2.0](LICENSE) · state under `.airlock/` · versions in [CHANGELOG](CHANGELOG.md)
+That is the whole point in twelve seconds. The evals pass. The gate still blocks,
+because the blast radius includes a new `write` permission on an MCP server, and
+that needs a person. Reproduce it yourself with `bash docs/assets/demo.sh`.
 
-## What you get
-
-- **AI manifest** — agents, models, prompts, tools, skills, MCP, judges, evals
-- **Snapshot + behavioral diff** — blast radius with statistical CIs, not point estimates
-- **Policy engine** — `PASS` / `FAIL` / `NEEDS_APPROVAL` on the PR
-- **Cassette replay** — cheap CI without live provider calls
-- **Local-first** — state under `.airlock/`; nothing uploads by default
-- **Beside eval platforms** — keep LangSmith / Promptfoo; Airlock is the ship-or-block gate
-
-## The problem
-
-Traditional software has a release pipeline. AI systems change behavior **without** a conventional code change: a provider updates a model behind a stable string, a prompt edits, a skill lands, a tool schema widens, an MCP server gains permissions, a retrieval index drifts, a judge shifts.
-
-The production question is: **can we safely release this AI change?**  
-And its mirror: **did a change we never made just get released to us?**
-
-## How it works
-
-Same flow as the [developer guide](https://xdlc.dev/airlock/docs#how-a-change-is-gated):
-
-```text
-edit prompt / skill / model / MCP / tools
-        ↓
-airlock snapshot          # freeze what the AI system is
-        ↓
-airlock diff              # what changed, and which agents it hits
-        ↓
-airlock test / airlock ci # evals + policy verdict
-        ↓
-ship / block / human approve
-```
-
-State lives under **`.airlock/`** in your **application** repo. Nothing uploads by default.
-
-## Who it’s for
-
-| Good fit | Weak fit today |
-|----------|----------------|
-| LLM apps / agents with prompts, tools, skills, or MCP | Pure CRUD with no model/prompt/tool surface |
-| Teams that change prompts or models often and want PR gates | Need a hosted team dashboard |
-| Repos with eval cases / Promptfoo, or OTel GenAI spans | Need full SDK AST for every framework *now* |
-
-This repo is the CLI, the Action, and the local store. There is no hosted dashboard. What is planned next lives on the [roadmap](https://xdlc.dev/airlock/docs/roadmap).
-
----
+- **Local-first.** State lives in `.airlock/` in your own repo. Nothing uploads.
+- **No API keys to try it.** The toy agent replays recorded provider traffic.
+- **Beside your eval platform, not instead of it.** Keep LangSmith or Promptfoo.
 
 ## Install
 
-**Platforms:** Linux / macOS · `amd64` / `arm64` (Windows not yet).  
-Pin a **pre-release** tag from [Releases](https://github.com/xdlc-labs/airlock/releases) (GitHub “latest” skips them). Current tag: see [CHANGELOG](CHANGELOG.md).
+Linux and macOS, `amd64` and `arm64`. Windows is not supported yet.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.11 bash
 # or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.11
 ```
 
-## Quick start - break a prompt, watch Airlock catch it
+This is a public beta, so every release is a pre-release and GitHub's "latest"
+link skips them. Pin the tag above, or pick one from
+[Releases](https://github.com/xdlc-labs/airlock/releases).
 
-Clone this repo. Toy agent at `testdata/toy-agent` ships prompts, a skill, MCP, and replay cassettes - **no API keys**.
+## Break a prompt, watch Airlock catch it
+
+Clone this repository. The toy agent in `testdata/toy-agent` ships prompts, a
+skill, two MCP servers, eval cases, and replay cassettes.
 
 ```bash
 cd testdata/toy-agent
@@ -93,177 +65,107 @@ airlock init && airlock snapshot
 ```
 
 ```console
-$ airlock init && airlock snapshot
 ╭─ airlock init ───────────────────────────────╮
-│ agents  1     models  1     prompts  2      │
-│ tools   0     skills  1     mcp      2      │
-│ evals   5                                   │
-│                                             │
-│ wrote  .airlock/manifest.json               │
+│ agents  1     models  1     prompts  2       │
+│ tools   0     skills  1     mcp      2       │
+│ evals   5                                    │
+│                                              │
+│ wrote  .airlock/manifest.json                │
 ╰──────────────────────────────────────────────╯
 ╭─ snapshot ───────────────────────────────────╮
-│ abc123def456                                │
-│ artifacts  12    manifest  def456abc123     │
+│ ef161e3ddcfcc893                             │
+│ artifacts  13    manifest  6147318f7acc      │
 ╰──────────────────────────────────────────────╯
 ```
 
-Nudge the system prompt (or edit a skill / widen MCP permissions):
+Now reword the system prompt and ask what it touches:
 
 ```bash
 echo "You are a DIFFERENT support agent." >> prompts/system.md
-airlock snapshot && airlock diff
+airlock diff
 ```
 
 ```console
-$ airlock snapshot && airlock diff
-╭─ snapshot ───────────────────────────────────╮
-│ ghi789abc012                                │
-│ artifacts  12    manifest  jkl012mno345     │
-╰──────────────────────────────────────────────╯
 ╭─ airlock ───────────────────────────────────────────────────╮
-│ base  abc123def456                                         │
-│ head  working                                              │
-│                                                            │
-│ changed                                                    │
-│   ~  prompt       system-prompt        a1b2c3d4 -> e5f6a7b8│
-│                                                            │
-│ blast radius                                               │
-│   agents  support-bot                                      │
-│   evals   default                                          │
+│ base  ef161e3ddcfcc893                                      │
+│ head  working-296121e6ab2e                                  │
+│                                                             │
+│ changed                                                     │
+│   ~  env          toy-env              04c19f51 -> 9fca1701 │
+│   ~  prompt       system-prompt        a68e98e0 -> 31125b19 │
+│                                                             │
+│ blast radius                                                │
+│   agents  support-bot                                       │
 ╰─────────────────────────────────────────────────────────────╯
 ```
 
-Run cheap replay evals. `airlock ci` writes `.airlock/ci-comment.md` (human log stays on the terminal, not in that file):
+`diff` compares the working tree against the last snapshot, so take the snapshot
+*before* you make the change. The toy agent's `env.json` bundles that prompt into
+an environment artifact, which is why two artifacts move for one edit.
+
+Then run the evals against recorded traffic:
 
 ```bash
 airlock test --mode replay
-airlock ci
 ```
 
 ```console
-$ airlock test --mode replay
-╭─ eval ───────────────────────────────────────╮
-│ metric             rate            95% CI  gate │
-│ task_success      100.0%  [ 47.8%, 100.0%]  PASS │
-╰──────────────────────────────────────────────╯
-╭─ verdict ────────────────────────────────────╮
-│ PASS                                        │
-│ samples=9  cost=$0.0000  wrote  .airlock/results/latest.json │
-╰──────────────────────────────────────────────╯
-
-$ airlock ci
-╭─ airlock ───────────────────────────────────────────────────╮
-│ base  abc123def456                                         │
-│ head  working                                              │
-│                                                            │
-│ changed                                                    │
-│   ~  prompt       system-prompt        a1b2c3d4 -> e5f6a7b8│
-│                                                            │
-│ blast radius                                               │
-│   agents  support-bot                                      │
-│   evals   default                                          │
-╰─────────────────────────────────────────────────────────────╯
-╭─ verdict ────────────────────────────────────╮
-│ PASS                                        │
-│ wrote  .airlock/ci-comment.md               │
-╰──────────────────────────────────────────────╯
+╭─ eval ────────────────────────────────────────────────────────────╮
+│ metric               rate             95% CI  gate                │
+│ json_valid        100.0%  [ 89.3%, 100.0%]  PASS                  │
+│     CI low 0.8928 >= min 0.8000                                   │
+│ task_success            -                  -  SKIPPED             │
+│     no baseline result to compare against — run `airlock baseline │
+│     create` (or pass --base) to enable this gate                  │
+│ tool_success      100.0%  [ 80.6%, 100.0%]  PASS                  │
+│     CI low 0.8064 >= min 0.8000                                   │
+╰───────────────────────────────────────────────────────────────────╯
+╭─ verdict ─────────────────────────────────────────────────────╮
+│ PASS                                                          │
+│ samples=48  cost=$0.0048  wrote  .airlock/results/latest.json │
+╰───────────────────────────────────────────────────────────────╯
 ```
 
-```markdown
-<!-- airlock-gate -->
-## Airlock
+Gates fire on confidence intervals, never on a point estimate. A comparative gate
+with no baseline yet reports `SKIPPED` rather than inventing a verdict, and it
+never fails the build on its own.
 
-> [!TIP]
-> **PASS** AI artifacts changed. Policy is green.
-
-| gate | changes | agents | evals |
-|---|---:|---|---|
-| **PASS** | 1 | **support-bot** | **default** |
-
-### Changes
-
-|  | kind | id |
-|:---:|---|---|
-| `~` | `prompt` | `system-prompt` |
-
-### Eval
-
-| metric | rate | 95% CI | gate | reason |
-|---|---:|---|---|---|
-| `task_success` | 100.0% | [47.8%, 100.0%] | **PASS** | no significant regression (delta CI [-0.02, 0.02]) |
-```
-
-Flip the story - expand MCP power instead of a prompt:
+Now the interesting one. Widen an MCP server's permissions instead:
 
 ```bash
-# e.g. add "write" under local-fs permissions in apm.lock.yaml
-airlock snapshot && airlock diff
+# add "write" under mcp.local-fs.permissions in apm.lock.yaml
 airlock ci --fail-on-approval
 ```
 
 ```console
-$ airlock diff
 ╭─ airlock ───────────────────────────────────────────────────╮
-│ base  abc123def456                                         │
-│ head  working                                              │
-│                                                            │
-│ changed                                                    │
-│   ~  mcp          local-fs                                 │
-│                                                            │
-│ blast radius                                               │
-│   agents  support-bot                                      │
-│                                                            │
-│   MCP new permission write on local-fs                     │
+│ base  ef161e3ddcfcc893                                      │
+│ head  working-d9681ff95c40                                  │
+│                                                             │
+│ changed                                                     │
+│   ~  mcp          local-fs             e1156c01 -> 05e044b6 │
+│                                                             │
+│ blast radius                                                │
+│   agents  support-bot                                       │
+│                                                             │
+│   MCP new permission write on local-fs                      │
+│   MCP permissions expanded: local-fs                        │
 ╰─────────────────────────────────────────────────────────────╯
-
-$ airlock ci --fail-on-approval
-╭─ verdict ────────────────────────────────────╮
-│ NEEDS_APPROVAL                              │
-│ airlock approve --base ... --head working   │
-│ wrote  .airlock/ci-comment.md               │
-╰──────────────────────────────────────────────╯
-error: airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base ... --head ...)
+╭─ verdict ───────────────────────────────────────────────────────────╮
+│ NEEDS_APPROVAL                                                      │
+│ airlock approve --base ef161e3ddcfcc893 --head working-d9681ff95c40 │
+│ wrote  .airlock/ci-comment.md                                       │
+╰─────────────────────────────────────────────────────────────────────╯
+error: airlock ci: NEEDS_APPROVAL without ledger entry
 exit 1
 ```
 
-Flip it again - a prompt edit that quietly rides in with a new dependency (agent-driven supply chain):
+Adding a skill, widening a write tool, or a live MCP server growing a new tool in
+its `tools/list` all take the same path. `airlock approve` records the decision in
+a ledger so the next run knows a human said yes.
 
-```bash
-# edit prompts/system.md AND add a package under `packages:` in apm.lock.yaml
-airlock diff --base <baseline-snapshot-id>
-airlock ci --base <baseline-snapshot-id> --fail-on-approval
-```
-
-```console
-$ airlock diff --base aaee8c11172c86b1
-╭─ airlock ───────────────────────────────────────────────────╮
-│ base  aaee8c11172c86b1                                     │
-│ head  working                                              │
-│                                                            │
-│ changed                                                    │
-│   +  dependency   left-pad                                 │
-│   ~  prompt       system-prompt        a68e98e0 -> 31125b19│
-│                                                            │
-│ blast radius                                               │
-│   agents  support-bot                                      │
-│                                                            │
-│   new dependency: left-pad                                 │
-╰─────────────────────────────────────────────────────────────╯
-
-$ airlock ci --base aaee8c11172c86b1 --fail-on-approval
-╭─ verdict ────────────────────────────────────╮
-│ NEEDS_APPROVAL                              │
-│ airlock approve --base aaee8c11172c86b1 --head working │
-╰──────────────────────────────────────────────╯
-error: airlock ci: NEEDS_APPROVAL without ledger entry (run: airlock approve --base ... --head ...)
-exit 1
-```
-
-A dependency added **on its own** (no prompt/skill/MCP/agent change alongside it) does not trigger this - that PR is Dependabot / SCA's job, not Airlock's. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
-
-The job is **AI change control on the PR**, not hoping the prompt looks fine.
-
-`--mode live` hits real providers (API keys + `budgets.max_cost_per_pr`). Full walkthrough: **[Developer guide](https://xdlc.dev/airlock/docs)**.
+The full walkthrough, including `--mode live`, judges, drift, and the production
+loop, is in the [developer guide](docs/GUIDE.md).
 
 ## Use it on your repo
 
@@ -284,143 +186,68 @@ jobs:
       - uses: xdlc-labs/airlock@v0.1.0-beta.11
 ```
 
-That is the whole install. On a version tag the Action downloads the CLI. `uses: ./` (this repo) builds from source. It diffs merge-base vs HEAD and comments on the PR. Fail-closed on permission expansion by default.
+That is the whole install. The Action diffs merge-base against HEAD, writes
+`.airlock/ci-comment.md`, and comments on the pull request. It fails closed on
+permission expansion by default.
 
-Optional: `airlock init` and commit `.airlock/policy.yml` if you want custom gates. CI generates a stub when that file is missing.
+`airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. Its
+default mins are strict on purpose: a `0.99` gate needs at least 381 clean samples
+before a 95% interval can clear it, so if you leave the sample budget low that
+gate will report `INCONCLUSIVE` forever. Airlock now tells you the number it
+needs. Raise `max_samples_per_case`, lower the min, or add
+`--fail-on-inconclusive` so an undecided gate blocks instead of passing quietly.
 
-### Security in CI
+## What it gates, and what it does not
 
-Airlock gates **AI release risk** on the PR - not general AppSec:
+Airlock gates **AI release risk on the pull request**. It is not a general
+application security scanner.
 
-| Airlock blocks (with flags) | Still use elsewhere |
-|-----------------------------|---------------------|
-| MCP / write-tool / **skill** expansion (`--fail-on-approval`) | CodeQL / SAST |
-| Adversarial / injection cases when MCP or skills change | Dependabot / SCA / Socket / cargo-vet |
-| Eval regressions (`--fail-on-eval`); PII in model I/O | Repo secret scanners |
+| Airlock blocks | Keep using |
+|---|---|
+| MCP, write-tool, and skill permission expansion (`--fail-on-approval`) | CodeQL and other SAST |
+| Eval regressions and undecided gates (`--fail-on-eval`, `--fail-on-inconclusive`) | Dependabot, Socket, `cargo-vet` |
+| PII or secrets appearing in model input and output (`data_boundary.fail_on_pii`) | Repository secret scanning |
+| A new dependency riding along with a prompt, skill, or MCP change | SCA on dependency-only pull requests |
 
-Skill / MCP power expansion → `NEEDS_APPROVAL`. Approvals are advisory until CI uses `--fail-on-approval`.
+That last row is the narrow claim worth being precise about: a dependency bump on
+its own is Dependabot's job and Airlock stays quiet. It speaks up when an
+AI-artifact change and a new dependency arrive in the same pull request, which is
+what an agent proposing its own tools looks like. Details in the
+[roadmap](docs/ROADMAP.md#agent-driven-supply-chain).
 
-**Supply chain (npm, crates.io, PyPI, …):** classic malware-in-the-lockfile is still Dependabot / SCA / provenance. Agents make it worse by proposing or merging deps at machine speed. Airlock’s angle is the **AI release surface**: when a prompt/skill/MCP/agent change also expands an APM-tracked package dependency, that lands in blast radius as `NEEDS_APPROVAL` (`--fail-on-approval` blocks merge) - a dep-only PR with no AI-artifact change is left to SCA. Not replacing package-manager security scanners. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
+## If you already use LangSmith, Braintrust, Langfuse, or Phoenix
 
-### If you use LangSmith (or Braintrust / Langfuse / Phoenix)
+Keep them. They trace runs, hold datasets, and let you iterate on prompts in a UI.
+Airlock is the ship-or-block decision on the pull request, which none of them make
+for you. Point Airlock at eval cases you already trust with
+`airlock import promptfoo|langsmith|braintrust`, feed production signal through
+`airlock ingest otel`, and leave your traces where they are. There is no native
+connector yet, and no hosted dashboard here at all. See the
+[roadmap](docs/ROADMAP.md#langsmith--braintrust--langfuse--phoenix).
 
-Keep the observability + eval platform. Airlock is the **release gate beside it**, not a replacement.
+## What is in the box
 
-| They do | Airlock does |
-|---------|----------------|
-| Trace runs, online evals, datasets, playground, annotation queues | Snapshot / diff / policy / CI ship-or-block on the PR |
-| Iterate prompts and compare experiments in a UI | Fail closed when prompts, skills, MCP, or models change |
+`init` and `snapshot` build a content-addressed record of the AI system. `diff`
+reports what moved and which agents it reaches. `test` and `ci` run statistical
+evals and decide. `approve` and `rollback` handle human gates and re-pinning a
+known-good release. `sentinel` fingerprints upstream models so you notice when a
+provider changes one under a stable name. `ingest otel`, `baseline`, and `drift`
+close the loop from production. `history --serve` gives you a read-only local UI.
 
-**Today (beta):**
-
-1. Keep tracing and datasets in LangSmith (or similar).
-2. In the **application** repo: `airlock init`, point evals at cases you already trust (Promptfoo YAML, or export dataset → Airlock eval JSONL / `airlock import promptfoo`).
-3. Tune `.airlock/policy.yml`; add `uses: xdlc-labs/airlock@<tag>` after checkout.
-4. Optional: feed production signal via `airlock ingest otel` → `baseline` / `drift` (OTel JSONL; not a live LangSmith API sync yet).
-
-**Not yet:** native LangSmith connector, prompt playground, hosted annotation queues, managed agent deploy. Those stay on their platform; Airlock borrows the *flexibility* into later phases without becoming the trace UI. Details: [docs/ROADMAP.md](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
-
----
-
-## What ships in the stack
-
-A full **AI release stack**, not a single command:
-
-| Primitive | Role |
-|-----------|------|
-| **AI Manifest** | Normalized graph of agents, models, prompts, tools, skills, MCP, judges, evals (imports [APM](https://github.com/microsoft/apm) lockfiles) |
-| **Release Snapshot** | Content-addressed record of everything needed to reproduce behavior |
-| **Behavioral Diff** | What changed + blast radius; statistical candidate vs baseline (CIs, not point estimates) |
-| **Policy Engine** | Gates → `PASS` / `FAIL` / `INCONCLUSIVE` / `NEEDS_APPROVAL` (comparative gates show `SKIPPED` with no baseline yet — never fails closed on its own) |
-| **Cassette Store** | Deterministic replay of provider/tool HTTP for cheap CI |
-| **Judge Registry** | Pinned, versioned, calibrated evaluators |
-| **Production-derived evals** | OTel ingest + local redaction → baselines |
-| **Drift detection** | Live vs approved baseline even with no deploy |
-| **Data boundary** | Fail release when PII/secrets appear in model I/O (`data_boundary.fail_on_pii`) |
-| **Rollback / routing hints** | Re-pin known-good manifest; emit decisions for gateways |
-| **Agent-driven supply chain** | APM dependency tracked as blast radius; `NEEDS_APPROVAL` when AI-artifact change co-occurs with a new dependency |
-| **Model Sentinel** | Fingerprint upstream models; catch silent provider drift (`airlock sentinel`) |
-| **Stack scanner** | OpenAI SDK + LangGraph heuristics; live MCP schema fetch for HTTP servers |
-| **Eval flexibility** | Artifact→suite bindings, experiment compare, eval promote, LangSmith/Braintrust import |
-| **Lockfile deps** | `go.sum` / `package-lock.json` / `Cargo.lock` → supply-chain blast radius |
-
-```mermaid
-flowchart TB
-  inputs["git + APM + prompts + skills + MCP + OTel"]
-  engine["Airlock release engine"]
-  out["CI decision + gateway routing hints"]
-  inputs --> engine --> out
-  subgraph parts [Inside the engine]
-    discovery["discovery / manifest / snapshot / diff"]
-    evals["evals + stats + cassettes + judges"]
-    pol["policy → ship / block / approve"]
-    store["local .airlock store"]
-  end
-  engine --- discovery
-  engine --- evals
-  engine --- pol
-  engine --- store
-```
-
-## What `init` can see today
-
-`airlock init` is **not** every industry SDK:
-
-| Source | Today |
-|--------|--------|
-| APM (`apm.lock.yaml` / `apm.yml`) | Yes (skills → first-class `skill`) |
-| Agent Skills (`SKILL.md` under `.claude/skills`, `.agents/skills`, `.gemini/skills`) | Yes |
-| Cursor rules (`.cursor/rules/*.mdc`, `*.md`) | Yes (as `prompt`, source `cursor-rules`) |
-| MCP configs / prompt files / `env.json` | Yes |
-| Model strings in config / `.env.example` | Heuristic |
-| `go.sum` / `package-lock.json` / `Cargo.lock` | Yes (supply-chain dependencies) |
-| Promptfoo / eval globs | Yes (+ LangSmith / Braintrust import) |
-| OpenAI SDK + LangGraph (py/ts/go heuristics) | Yes |
-| OpenAI / Anthropic / Google SDK full AST | Partial heuristics; deepen over time |
-| Vercel AI SDK, CrewAI, … | Not yet |
-| Langfuse / remote prompt registries | Not yet |
-| Live MCP schema fetch | HTTP(S) servers at scan time; stdio config-hash only |
-
-Agent dependency locking is [APM](https://github.com/microsoft/apm)’s job; Airlock imports it. Details: [Developer guide — discovery](https://xdlc.dev/airlock/docs#what-init-discovers-today).
-
-## Commands
-
-| Command | Capability |
-|---------|------------|
-| `init` / `snapshot` / `diff` | Manifest discovery, release snapshots, blast-radius diff |
-| `test` / `ci` | Statistical evals + PR release decision |
-| `ci --fail-on-eval` / `--fail-on-inconclusive` / `--fail-on-approval` | Fail closed |
-| `import promptfoo\|langsmith\|braintrust` | Bring existing eval corpora |
-| `eval promote --from ingest\|results` | Promote failed runs → eval cases |
-| `ingest otel` / `baseline create` / `drift` | Production loop |
-| `judge calibrate` / `attribution` | Judge as a versioned dependency |
-| `approve` / `rollback` | Permission expansion + known-good re-pin |
-| `sentinel probe\|check` | Model fingerprint + silent drift detection |
-| `history` | Local release history (`--serve` for read-only UI) |
-
-Gates fire only when a confidence interval **excludes** the threshold. Cassettes replay identical provider calls by request hash (not Docker layers).
-
----
+Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
+files, Promptfoo suites, `go.sum`, `package-lock.json`, `Cargo.lock`, and
+heuristics for the OpenAI SDK and LangGraph. It is not every framework yet. The
+[guide](docs/GUIDE.md#what-init-discovers-today) lists exactly what is and is not
+detected today, and the [roadmap](docs/ROADMAP.md) covers the rest.
 
 ## Status
 
-Public beta: snapshot, diff, eval, policy, and the CI Action. Release notes: [CHANGELOG.md](CHANGELOG.md). What might come later: [roadmap](https://xdlc.dev/airlock/docs/roadmap).
+Public beta. Expect discovery gaps and CLI churn before 1.0. No telemetry, no
+hosted control plane, nothing uploads by default.
 
-## Development
-
-```bash
-go test ./... -count=1 -race
-golangci-lint run ./...
-```
-
-This repository’s CI is [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (Go test/lint). Releases: [docs/RELEASING.md](docs/RELEASING.md).
-
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Changelog](CHANGELOG.md) · [Guide](https://xdlc.dev/airlock/docs) · [Roadmap](https://xdlc.dev/airlock/docs/roadmap)
-
-## Related
-
-Failed GitHub Actions, and you want a Fix from the coding agent you already run? See [xdlc-agent](https://github.com/xdlc-labs/xdlc-agent).
-
-## License
-
-[Apache License 2.0](LICENSE)
+[Guide](docs/GUIDE.md) ·
+[Roadmap](docs/ROADMAP.md) ·
+[Changelog](CHANGELOG.md) ·
+[Contributing](CONTRIBUTING.md) ·
+[Security](SECURITY.md) ·
+[Apache-2.0](LICENSE)

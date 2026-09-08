@@ -1,0 +1,23 @@
+# Policy for the toy agent used by the README quick start.
+#
+# This is deliberately not the stub `airlock init` generates. The default gates
+# (tool_success 0.99, json_valid 0.995) need >= 381 and >= 765 clean samples
+# before a 95% Wilson interval can clear them, and this fixture has 3 eval
+# cases. At the default budget those gates can only ever report INCONCLUSIVE.
+# The mins below are reachable at 16 samples per case, so the walkthrough
+# reaches a real PASS in milliseconds against the replay cassettes.
+#
+# Copy the shape, not the numbers: pick mins your own sample budget can clear,
+# or raise max_samples_per_case to match the min you want.
+version: 1
+fail_on_ai_change: false
+data_boundary:
+  fail_on_pii: false
+gates:
+  tool_success: { min: 0.80, confidence: 0.95 }
+  json_valid: { min: 0.80, confidence: 0.95 }
+  task_success: { max_regression_pp: 1.0, confidence: 0.95 }
+  adversarial_critical: { max_new_critical: 0, confidence: 0.95 }
+budgets:
+  max_cost_per_pr: 2.00
+  max_samples_per_case: 16

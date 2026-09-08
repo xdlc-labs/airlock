@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -94,6 +95,22 @@ func Validate(m *Manifest) error {
 	return nil
 }
 
+// mcpArtifactHash binds an MCP server's granted permissions into its artifact
+// hash. SchemaHash alone describes the server's tool surface, and in an APM
+// lockfile it is often a pinned literal, so widening `permissions:` would not
+// move it. Diff only inspects artifacts whose hash changed, so a
+// permissions-only edit used to slip through the approval gate entirely.
+// Permissions are sorted so reordering is not reported as a change.
+func mcpArtifactHash(x MCPServer) string {
+	if len(x.Permissions) == 0 {
+		return x.SchemaHash
+	}
+	perms := make([]string, len(x.Permissions))
+	copy(perms, x.Permissions)
+	sort.Strings(perms)
+	return HashString(x.SchemaHash + "|perms:" + strings.Join(perms, ","))
+}
+
 // Artifacts flattens hashed units from the manifest for snapshotting.
 func Artifacts(m *Manifest) []ArtifactRef {
 	out := make([]ArtifactRef, 0, len(m.Models)+len(m.Prompts)+len(m.Tools)+len(m.Skills)+len(m.MCPServers)+len(m.Evals)+len(m.Agents)+len(m.Envs))
@@ -110,7 +127,7 @@ func Artifacts(m *Manifest) []ArtifactRef {
 		out = append(out, ArtifactRef{Kind: "skill", ID: x.ID, Hash: x.ContentHash})
 	}
 	for _, x := range m.MCPServers {
-		out = append(out, ArtifactRef{Kind: "mcp", ID: x.ID, Hash: x.SchemaHash})
+		out = append(out, ArtifactRef{Kind: "mcp", ID: x.ID, Hash: mcpArtifactHash(x)})
 	}
 	for _, x := range m.Evals {
 		h := HashString(x.Path + "|" + x.Kind)

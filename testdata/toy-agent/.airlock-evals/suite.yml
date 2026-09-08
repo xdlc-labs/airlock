@@ -1,7 +1,7 @@
 # Toy suite for offline mock provider tests
 k: 3
 min_samples: 2
-max_samples_per_case: 3
+max_samples_per_case: 16
 seed: 42
 cases: default.jsonl
 mode: live
