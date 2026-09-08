@@ -1,5 +1,12 @@
 # Local Airlock state (app repos + testdata)
 .airlock/
+# ...except the toy agent's committed policy. The default gates that `init`
+# writes (0.99 / 0.995) cannot resolve at a 3-case sample budget, so without a
+# tuned policy the README quick start ends at INCONCLUSIVE on a fresh clone.
+# `init` leaves an existing policy alone, so this one survives.
+!testdata/toy-agent/.airlock/
+testdata/toy-agent/.airlock/*
+!testdata/toy-agent/.airlock/policy.yml
 
 # Built CLI (repo-root binary from `go build -o airlock ./cmd/airlock`)
 /airlock
