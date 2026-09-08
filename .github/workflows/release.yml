@@ -2,7 +2,12 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    # Two dots minimum, so a full version such as v0.1.0-beta.13 matches and the
+    # moving major tag v0 does not. `v*` matched v0 too, so every time v0 was
+    # repointed this workflow published a release literally named "Airlock 0",
+    # carrying version-less airlock_0_<os>_<arch> assets, which GitHub then
+    # served as the repository's latest release.
+    tags: ["v*.*.*"]
   workflow_dispatch:
     inputs:
       tag:
