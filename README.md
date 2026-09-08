@@ -238,7 +238,8 @@ and `drift` close the loop from production. `history --serve` gives you a
 read-only local UI.
 
 Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
-files, Promptfoo suites, `go.sum`, `package-lock.json`, `Cargo.lock`, and
+files, Promptfoo suites, `go.sum`, `package-lock.json`, `pnpm-lock.yaml`,
+`yarn.lock`, `Cargo.lock`, `poetry.lock`, `Pipfile.lock`, `uv.lock`, and
 heuristics for the OpenAI SDK and LangGraph. It is not every framework yet. The
 [guide](https://xdlc.dev/airlock/docs/guide#what-init-discovers-today) lists exactly what is and is not
 detected today, and the [roadmap](https://xdlc.dev/airlock/docs/roadmap) covers the rest.

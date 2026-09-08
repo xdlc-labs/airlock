@@ -8,6 +8,7 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+- Lockfile discovery for `pnpm-lock.yaml`, `yarn.lock` (classic and Berry), `poetry.lock`, `Pipfile.lock`, and `uv.lock`. They feed the same agent-driven supply-chain gate as `go.sum` / `package-lock.json` / `Cargo.lock`.
 
 ### Changed
 - Docs: in-repo GUIDE, ROADMAP, and blog posts are gone. The README walkthrough stays here. The full guide and roadmap live on [xdlc.dev](https://xdlc.dev/airlock/docs/guide).
