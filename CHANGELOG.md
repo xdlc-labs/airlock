@@ -19,6 +19,11 @@ Makes `uses: xdlc-labs/airlock@v0` use the release binary. Required if you follo
 the README, which now recommends the moving tag.
 
 ### Fixed
+- Pushing the moving `v0` tag published a release. The Release workflow triggered
+  on `v*`, which matches `v0`, so repointing the tag created a release named
+  "Airlock 0" with version-less `airlock_0_<os>_<arch>` assets, and GitHub served
+  that as the repository's latest release ahead of every real version. The trigger
+  now requires a full version tag.
 - The Action built its download URL straight from `github.action_ref`, so a
   major-only ref asked for `releases/download/v0/airlock_0_<os>_<arch>.tar.gz`,
   which is not a release name and never existed. Every `@v0` run 404'd and fell
