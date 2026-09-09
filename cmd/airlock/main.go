@@ -104,6 +104,7 @@ Commands:
   test        Run the eval suite
   ci          Diff, evals, approval gate, write PR comment
   import      Import promptfoo, langsmith, or braintrust cases
+              (langsmith --dataset NAME pulls live over the API)
   eval        Promote ingest or results into eval cases
   ingest      Ingest OTel GenAI JSONL (local redaction)
   baseline    Promote ingest into .airlock/evals/prod.jsonl
@@ -609,13 +610,13 @@ func cmdCI(args []string) error {
 
 func cmdImport(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: airlock import promptfoo|langsmith|braintrust <file> [--path DIR]")
+		return fmt.Errorf("usage: airlock import promptfoo|langsmith|braintrust <file> [--path DIR]\n       airlock import langsmith --dataset NAME [--limit N] [--api-url URL] [--path DIR]")
 	}
 	switch args[0] {
 	case "promptfoo":
 		return cmdImportPromptfoo(args[1:])
 	case "langsmith":
-		return cmdImportCases(args[1:], "langsmith")
+		return cmdImportLangSmith(args[1:])
 	case "braintrust":
 		return cmdImportCases(args[1:], "braintrust")
 	default:
@@ -648,6 +649,46 @@ func cmdImportPromptfoo(args []string) error {
 		out.Warn(w)
 	}
 	return writeImportedCases(root, res.Cases, "default.jsonl")
+}
+
+// cmdImportLangSmith imports from a dataset over the LangSmith API when
+// --dataset is given, and from an exported file otherwise.
+func cmdImportLangSmith(args []string) error {
+	rest, dataset := flagVal(args, "--dataset")
+	rest, limitS := flagVal(rest, "--limit")
+	rest, apiURL := flagVal(rest, "--api-url")
+	if dataset == "" {
+		if apiURL != "" || limitS != "" {
+			return fmt.Errorf("--api-url and --limit only apply with --dataset")
+		}
+		return cmdImportCases(rest, "langsmith")
+	}
+	root, rest, err := rootFromArgs(rest)
+	if err != nil {
+		return err
+	}
+	if len(rest) > 0 {
+		return fmt.Errorf("import langsmith takes a file or --dataset, not both")
+	}
+	limit := 0
+	if limitS != "" {
+		limit, err = strconv.Atoi(limitS)
+		if err != nil || limit < 0 {
+			return fmt.Errorf("--limit must be a non-negative number, got %q", limitS)
+		}
+	}
+	client, err := langsmith.NewClient(apiURL)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Pulling dataset %s from %s\n", dataset, client.BaseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cases, err := client.ImportDataset(ctx, dataset, limit)
+	if err != nil {
+		return err
+	}
+	return writeImportedCases(root, cases, "langsmith.jsonl")
 }
 
 func cmdImportCases(args []string, source string) error {

@@ -237,8 +237,23 @@ Keep them. They trace runs, hold datasets, and let you iterate on prompts in a U
 Airlock is the ship-or-block decision on the pull request, which none of them make
 for you. Point Airlock at eval cases you already trust with
 `airlock import promptfoo|langsmith|braintrust`, feed production signal through
-`airlock ingest otel`, and leave your traces where they are. There is no native
-connector yet, and no hosted dashboard here at all. See the
+`airlock ingest otel`, and leave your traces where they are.
+
+A LangSmith dataset can be pulled straight from the API instead of exporting it
+by hand:
+
+```bash
+export LANGSMITH_API_KEY=...            # or LANGCHAIN_API_KEY
+airlock import langsmith --dataset support-golden        # or a dataset id
+airlock import langsmith --dataset support-golden --limit 200
+```
+
+Cases land in `.airlock/evals/langsmith.jsonl`, the same place the file import
+writes them, so `test` and `ci` pick them up unchanged. Self-hosted LangSmith:
+point `--api-url` (or `LANGSMITH_ENDPOINT`) at your host, including any
+`/api/v1` prefix it serves. The pull reads datasets only — traces, online eval
+scores, and annotation queues stay where they are, and there is no hosted
+dashboard here at all. See the
 [roadmap](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
 
 ## What is in the box
