@@ -121,9 +121,23 @@ test flags: --path --suite --affected --mode --json --baseline-results ID --adve
 ci flags:   --fail-on-change --fail-on-eval --fail-on-inconclusive --fail-on-approval --fail-on-sentinel --comment --skip-eval --adversarial
             (or set them once in .airlock/policy.yml under fail_on:)
 redact:     --redact pii|hash|off (ingest / baseline)
+mcp stdio:  --mcp-stdio (init / snapshot / diff / ci) runs stdio MCP servers
+            to read their live tool list. Off by default: it executes the
+            commands in this repository's MCP config.
 
 Local-first. Nothing uploads.
 `)
+}
+
+// mcpStdioOpt reads --mcp-stdio. It is off by default because probing a stdio
+// MCP server means running the command the repository's config names, with this
+// process's environment.
+func mcpStdioOpt(args []string) ([]string, discovery.Options) {
+	args, on := flagBool(args, "--mcp-stdio")
+	if on {
+		fmt.Fprintln(os.Stderr, "warning: --mcp-stdio runs the MCP server commands configured in this repository; do not enable it for untrusted branches")
+	}
+	return args, discovery.Options{ProbeStdioMCP: on}
 }
 
 func rootFromArgs(args []string) (string, []string, error) {
@@ -144,15 +158,16 @@ func flagVal(args []string, name string) ([]string, string) {
 }
 
 func cmdInit(args []string) error {
-	root, _, err := rootFromArgs(args)
+	root, args, err := rootFromArgs(args)
 	if err != nil {
 		return err
 	}
+	_, opt := mcpStdioOpt(args)
 	p := store.ForRoot(root)
 	if err := p.Ensure(); err != nil {
 		return err
 	}
-	m, err := discovery.Scan(root)
+	m, err := discovery.ScanWith(root, opt)
 	if err != nil {
 		return err
 	}
@@ -182,8 +197,9 @@ func cmdSnapshot(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, withSentinel := flagBool(args, "--sentinel")
-	snap, err := snapshot.Create(root, true)
+	args, withSentinel := flagBool(args, "--sentinel")
+	_, opt := mcpStdioOpt(args)
+	snap, err := snapshot.CreateWith(root, true, opt)
 	if err != nil {
 		return err
 	}
@@ -203,9 +219,9 @@ func cmdSnapshot(args []string) error {
 	return nil
 }
 
-func loadHead(root, headID string) (*manifest.Snapshot, error) {
+func loadHead(root, headID string, opt discovery.Options) (*manifest.Snapshot, error) {
 	if headID == "" || headID == "working" {
-		return snapshot.FromWorkingTree(root)
+		return snapshot.FromWorkingTreeWith(root, opt)
 	}
 	return snapshot.Load(root, headID)
 }
@@ -217,15 +233,16 @@ func cmdDiff(args []string) error {
 	}
 	args, asJSON := flagBool(args, "--json")
 	args, baseID := flagVal(args, "--base")
-	_, headID := flagVal(args, "--head")
+	args, headID := flagVal(args, "--head")
 	if headID == "" {
 		headID = "working"
 	}
+	_, opt := mcpStdioOpt(args)
 	base, err := snapshot.Load(root, baseID)
 	if err != nil {
 		return fmt.Errorf("base: %w", err)
 	}
-	head, err := loadHead(root, headID)
+	head, err := loadHead(root, headID, opt)
 	if err != nil {
 		return fmt.Errorf("head: %w", err)
 	}
@@ -454,10 +471,11 @@ func cmdCI(args []string) error {
 	args, skipEval := flagBool(args, "--skip-eval")
 	args, adversarial := flagBool(args, "--adversarial")
 	args, baseID := flagVal(args, "--base")
-	_, headID := flagVal(args, "--head")
+	args, headID := flagVal(args, "--head")
 	if headID == "" {
 		headID = "working"
 	}
+	_, opt := mcpStdioOpt(args)
 
 	// Policy can turn gates into blockers so a repo keeps them on without every
 	// workflow repeating the flags. A flag still forces a gate on; policy never
@@ -482,7 +500,7 @@ func cmdCI(args []string) error {
 	if err != nil {
 		return fmt.Errorf("base: %w", err)
 	}
-	head, err := loadHead(root, headID)
+	head, err := loadHead(root, headID, opt)
 	if err != nil {
 		return err
 	}
@@ -1094,7 +1112,8 @@ func cmdApprove(args []string) error {
 	if err != nil {
 		return err
 	}
-	head, err := loadHead(root, headID)
+	// No stdio probe here: recording an approval should not run anything.
+	head, err := loadHead(root, headID, discovery.Options{})
 	if err != nil {
 		return err
 	}

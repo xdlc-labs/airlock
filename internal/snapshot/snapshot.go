@@ -12,6 +12,11 @@ import (
 
 // Create scans root (or uses existing manifest), builds a content-addressed snapshot, persists it.
 func Create(root string, rescan bool) (*manifest.Snapshot, error) {
+	return CreateWith(root, rescan, discovery.Options{})
+}
+
+// CreateWith is Create with discovery options applied to the rescan.
+func CreateWith(root string, rescan bool, opt discovery.Options) (*manifest.Snapshot, error) {
 	p := store.ForRoot(root)
 	if err := p.Ensure(); err != nil {
 		return nil, err
@@ -20,11 +25,11 @@ func Create(root string, rescan bool) (*manifest.Snapshot, error) {
 	var m *manifest.Manifest
 	var err error
 	if rescan {
-		m, err = discovery.Scan(root)
+		m, err = discovery.ScanWith(root, opt)
 	} else {
 		m, err = store.ReadManifest(p)
 		if err != nil {
-			m, err = discovery.Scan(root)
+			m, err = discovery.ScanWith(root, opt)
 		}
 	}
 	if err != nil {
@@ -60,7 +65,12 @@ func Create(root string, rescan bool) (*manifest.Snapshot, error) {
 
 // FromWorkingTree builds an in-memory snapshot without writing (for diff head).
 func FromWorkingTree(root string) (*manifest.Snapshot, error) {
-	m, err := discovery.Scan(root)
+	return FromWorkingTreeWith(root, discovery.Options{})
+}
+
+// FromWorkingTreeWith is FromWorkingTree with discovery options applied.
+func FromWorkingTreeWith(root string, opt discovery.Options) (*manifest.Snapshot, error) {
+	m, err := discovery.ScanWith(root, opt)
 	if err != nil {
 		return nil, err
 	}

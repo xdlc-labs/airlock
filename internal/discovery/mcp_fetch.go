@@ -14,15 +14,34 @@ import (
 	"github.com/xdlc-labs/airlock/internal/manifest"
 )
 
-// ponytail: HTTP/SSE url MCP only; stdio servers stay config-hash until spawn support lands.
+const mcpProtocolVersion = "2024-11-05"
 
 type mcpServerCfg struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
+	// Command, Args, and Env describe a stdio server. Reading its tool list means
+	// running it, so that path is opt-in: see Options.ProbeStdioMCP.
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env"`
 }
 
-// enrichMCPSchemas fetches live tool schemas for MCP servers with http(s) urls.
-func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Manifest, configs map[string]json.RawMessage) {
+// rpcEnvelope is a JSON-RPC response from either transport. ID is absent on
+// notifications.
+type rpcEnvelope struct {
+	ID     *int            `json:"id"`
+	Result json.RawMessage `json:"result"`
+	Error  *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// enrichMCPSchemas reads live tool schemas for MCP servers: over http(s) for
+// servers with a url, and, when opted in, by spawning servers configured with a
+// command. A stdio server that is not probed keeps its config hash and nothing
+// else, exactly as before.
+func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Manifest, configs map[string]json.RawMessage, opt Options) {
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
@@ -35,13 +54,26 @@ func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Mani
 			continue
 		}
 		var cfg mcpServerCfg
-		if err := json.Unmarshal(raw, &cfg); err != nil || cfg.URL == "" {
+		if err := json.Unmarshal(raw, &cfg); err != nil {
 			continue
 		}
-		if !strings.HasPrefix(strings.ToLower(cfg.URL), "http") {
+
+		var (
+			schema    json.RawMessage
+			toolNames []string
+			err       error
+			tag       string
+		)
+		switch {
+		case strings.HasPrefix(strings.ToLower(cfg.URL), "http"):
+			schema, toolNames, err = fetchMCPToolsSchema(ctx, client, cfg)
+			tag = "mcp-live"
+		case cfg.Command != "" && opt.ProbeStdioMCP:
+			schema, toolNames, err = probeStdioMCPTools(ctx, m.Root, cfg)
+			tag = "mcp-stdio"
+		default:
 			continue
 		}
-		schema, toolNames, err := fetchMCPToolsSchema(ctx, client, cfg)
 		if err != nil {
 			m.Unpinned = append(m.Unpinned, manifest.UnpinnedRisk{
 				Artifact: "mcp:" + m.MCPServers[i].ID,
@@ -52,8 +84,8 @@ func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Mani
 		h := manifest.HashBytes(schema)
 		if h != m.MCPServers[i].SchemaHash {
 			m.MCPServers[i].SchemaHash = h
-			if !strings.Contains(m.MCPServers[i].Source, "mcp-live") {
-				m.MCPServers[i].Source += "+mcp-live"
+			if !strings.Contains(m.MCPServers[i].Source, tag) {
+				m.MCPServers[i].Source += "+" + tag
 			}
 		}
 		// Always refresh, independent of SchemaHash equality: this is the field
@@ -65,7 +97,7 @@ func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Mani
 
 func fetchMCPToolsSchema(ctx context.Context, client *http.Client, cfg mcpServerCfg) ([]byte, []string, error) {
 	if err := mcpRPC(ctx, client, cfg, "initialize", map[string]any{
-		"protocolVersion": "2024-11-05",
+		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{},
 		"clientInfo":      map[string]string{"name": "airlock", "version": "1"},
 	}); err != nil {
@@ -75,21 +107,27 @@ func fetchMCPToolsSchema(ctx context.Context, client *http.Client, cfg mcpServer
 	if err := mcpRPCResult(ctx, client, cfg, "tools/list", map[string]any{}, &raw); err != nil {
 		return nil, nil, err
 	}
+	return raw, toolNamesFromResult(raw), nil
+}
+
+// toolNamesFromResult pulls the sorted tool names out of a tools/list result.
+func toolNamesFromResult(raw json.RawMessage) []string {
 	var parsed struct {
 		Tools []struct {
 			Name string `json:"name"`
 		} `json:"tools"`
 	}
 	var names []string
-	if err := json.Unmarshal(raw, &parsed); err == nil {
-		for _, t := range parsed.Tools {
-			if t.Name != "" {
-				names = append(names, t.Name)
-			}
-		}
-		sort.Strings(names)
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil
 	}
-	return raw, names, nil
+	for _, t := range parsed.Tools {
+		if t.Name != "" {
+			names = append(names, t.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }
 
 func mcpRPC(ctx context.Context, client *http.Client, cfg mcpServerCfg, method string, params any) error {
@@ -127,13 +165,7 @@ func mcpRPCResult(ctx context.Context, client *http.Client, cfg mcpServerCfg, me
 	if resp.StatusCode >= 300 {
 		return fmt.Errorf("HTTP %s: %s", resp.Status, truncateMCP(data))
 	}
-	var envelope struct {
-		Result json.RawMessage `json:"result"`
-		Error  *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
+	var envelope rpcEnvelope
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return err
 	}

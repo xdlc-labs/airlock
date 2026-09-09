@@ -48,7 +48,7 @@ func TestLiveMCPSchemaFetch(t *testing.T) {
 		}},
 	}
 	configs := map[string]json.RawMessage{"live": cfgRaw}
-	enrichMCPSchemas(context.Background(), srv.Client(), m, configs)
+	enrichMCPSchemas(context.Background(), srv.Client(), m, configs, Options{})
 	if m.MCPServers[0].SchemaHash == "config-only" {
 		t.Fatal("expected live schema hash to replace config-only hash")
 	}
