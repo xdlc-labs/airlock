@@ -84,3 +84,47 @@ func TestApplyToManifestChangesContentHash(t *testing.T) {
 	}
 	_ = path
 }
+
+func TestProbeAllSkipsUnprobeableProvider(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sentinel.json")
+	m := &manifest.Manifest{Models: []manifest.Model{
+		{ID: "model-gpt-4o", Provider: "mock", Model: "gpt-4o"},
+		{ID: "model-mistral-large-latest", Provider: "mistral", Model: "mistral-large-latest"},
+	}}
+	st, err := sentinel.ProbeAll(context.Background(), m, nil, path)
+	if err != nil {
+		t.Fatalf("one unprobeable model must not fail the sweep: %v", err)
+	}
+	if len(st.Records) != 1 {
+		t.Fatalf("expected 1 record, got %+v", st.Records)
+	}
+	if len(st.Skipped) != 1 || st.Skipped[0] != "model-mistral-large-latest" {
+		t.Fatalf("expected the mistral model skipped, got %+v", st.Skipped)
+	}
+}
+
+func TestCheckSkipsUnprobeableProvider(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sentinel.json")
+	m := &manifest.Manifest{Models: []manifest.Model{
+		{ID: "model-gpt-4o", Provider: "mock", Model: "gpt-4o"},
+		{ID: "model-qwen-max", Provider: "alibaba", Model: "qwen-max"},
+	}}
+	if _, err := sentinel.ProbeAll(context.Background(), m, nil, path); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := sentinel.Check(context.Background(), m, nil, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Probed != 1 {
+		t.Fatalf("expected probed=1, got %d", rep.Probed)
+	}
+	if len(rep.Skipped) != 1 || rep.Skipped[0] != "model-qwen-max" {
+		t.Fatalf("expected the qwen model skipped, got %+v", rep.Skipped)
+	}
+	if len(rep.Drifts) != 0 {
+		t.Fatalf("expected no drift, got %+v", rep.Drifts)
+	}
+}

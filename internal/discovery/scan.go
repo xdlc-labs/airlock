@@ -46,8 +46,8 @@ func Scan(root string) (*manifest.Manifest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("mcp: %w", err)
 	}
-	if err := scanOpenAIStack(abs, m); err != nil {
-		return nil, fmt.Errorf("openai-stack: %w", err)
+	if err := scanFrameworkStack(abs, m); err != nil {
+		return nil, fmt.Errorf("framework-stack: %w", err)
 	}
 	if len(mcpConfigs) > 0 {
 		enrichMCPSchemas(context.Background(), nil, m, mcpConfigs)
@@ -638,12 +638,12 @@ func scanModelHeuristics(root string, m *manifest.Manifest) error {
 				if strings.Contains(strings.ToLower(model), "model") && !strings.Contains(model, "-") {
 					continue
 				}
-				if !looksLikeModel(model) {
+				if !manifest.LooksLikeModel(model) {
 					continue
 				}
 				seen[model] = true
 				id := "model-" + slug(model)
-				provider := guessProvider(model)
+				provider := manifest.GuessProvider(model)
 				m.Models = append(m.Models, manifest.Model{
 					ID: id, Provider: provider, Model: model,
 					ContentHash: manifest.HashString(provider + "|" + model),
@@ -654,31 +654,6 @@ func scanModelHeuristics(root string, m *manifest.Manifest) error {
 		}
 	}
 	return nil
-}
-
-func looksLikeModel(s string) bool {
-	l := strings.ToLower(s)
-	prefixes := []string{"claude", "gpt", "gemini", "o1", "o3", "text-", "amazon.", "anthropic.", "openai."}
-	for _, p := range prefixes {
-		if strings.HasPrefix(l, p) {
-			return true
-		}
-	}
-	return strings.Contains(l, "claude") || strings.Contains(l, "gpt-")
-}
-
-func guessProvider(model string) string {
-	l := strings.ToLower(model)
-	switch {
-	case strings.Contains(l, "claude"):
-		return "anthropic"
-	case strings.Contains(l, "gpt") || strings.HasPrefix(l, "o1") || strings.HasPrefix(l, "o3"):
-		return "openai"
-	case strings.Contains(l, "gemini"):
-		return "google"
-	default:
-		return ""
-	}
 }
 
 func scanEvalHooks(root string, m *manifest.Manifest) error {
