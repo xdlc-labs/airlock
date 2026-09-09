@@ -10,6 +10,8 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ### Added
 
 ### Changed
+- The PR comment leads with what to do. When a change needs sign-off, the reasons and the `airlock approve` command now sit directly under the verdict instead of below the eval tables, where a reviewer had to scroll past the evidence to find the one command that unblocks the merge. The change table gained `where` and `hash` columns, so `~ prompt system-prompt` reads as `prompts/system.md` with the hash it moved from and to, and a folded Snapshots block names the two snapshots compared with the `airlock diff` that reproduces the comparison locally.
+- The PR comment is bounded: at most 30 change rows (with a count of what was left out) and a hard clamp at GitHub's 65536-byte comment limit. A gate report over that limit was rejected by the API, so a large PR could produce no comment at all.
 
 ### Fixed
 
