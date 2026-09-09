@@ -8,16 +8,36 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.1.0-beta.14] – 2026-09-09
+
+Discovers six more agent frameworks and more model families. Also scans pnpm,
+yarn, and Python lockfiles. Pin `uses: xdlc-labs/airlock@v0` or
+`@v0.1.0-beta.14`.
+
+### Highlights
+- CrewAI, AutoGen, LlamaIndex, the Vercel AI SDK, and the Anthropic SDK are tagged, not only the OpenAI SDK and LangGraph.
+- Mistral, Llama, DeepSeek, Qwen, Grok, and similar family ids are recognized.
+- Lockfiles for pnpm, yarn, Poetry, Pipenv, and uv feed the same supply-chain gate as `go.sum` / `package-lock.json` / `Cargo.lock`.
+
+### Known limits
+- Windows install not supported yet
+- Comparative gates still report `SKIPPED` until a baseline exists
+- Heuristics, not a full AST per language. Go SDKs that name models with exported constants stay invisible.
+
+### Added
 - Framework detection beyond the OpenAI SDK and LangGraph: the Anthropic SDK, LlamaIndex, CrewAI, AutoGen, and the Vercel AI SDK. Each source file is tagged with the framework it uses (`anthropic-sdk-scan`, `llamaindex-scan`, `crewai-scan`, `autogen-scan`, `vercel-ai-scan`), and a framework is recorded even when it names no model string of its own. Models named positionally, as the Vercel AI SDK does with `anthropic("claude-haiku-4-5")`, are now discovered too.
-- Model ids beyond the OpenAI, Anthropic, and Google names are recognized and attributed to a provider: Mistral (including Mixtral, Codestral, Devstral, Magistral, Pixtral), Llama, DeepSeek, Qwen, Grok, Cohere Command, GLM, Kimi, Gemma, Phi, and Amazon Nova. A family name must carry a version marker to count, so `llama-3.3-70b` is read as a model and `llama_index` stays a package. A bare family name (`mistral`) is not enough — write the id the provider serves.
+- Model ids beyond the OpenAI, Anthropic, and Google names are recognized and attributed to a provider: Mistral (including Mixtral, Codestral, Devstral, Magistral, Pixtral), Llama, DeepSeek, Qwen, Grok, Cohere Command, GLM, Kimi, Gemma, Phi, and Amazon Nova. A family name must carry a version marker to count, so `llama-3.3-70b` is read as a model and `llama_index` stays a package. A bare family name (`mistral`) is not enough: write the id the provider serves.
 - Lockfile discovery for `pnpm-lock.yaml`, `yarn.lock` (classic and Berry), `poetry.lock`, `Pipfile.lock`, and `uv.lock`. They feed the same agent-driven supply-chain gate as `go.sum` / `package-lock.json` / `Cargo.lock`.
 
 ### Changed
-- `airlock sentinel probe|check` skips a model whose provider has no probe support instead of aborting the sweep. Skipped ids are listed in the report and counted as `skipped=` in the text output. Previously one such model failed the whole run — reachable now that discovery attributes models to providers Airlock cannot call.
+- `airlock sentinel probe|check` skips a model whose provider has no probe support instead of aborting the sweep. Skipped ids are listed in the report and counted as `skipped=` in the text output. Previously one such model failed the whole run, reachable now that discovery attributes models to providers Airlock cannot call.
 - Docs: in-repo GUIDE, ROADMAP, and blog posts are gone. The README walkthrough stays here. The full guide and roadmap live on [xdlc.dev](https://xdlc.dev/airlock/docs/guide).
 - Docs: app repos use `uses: xdlc-labs/airlock@v0`. The in-repo workflow is dogfood (`uses: ./`), not a file to copy. Snapshot ids are described as stable. `airlock ci` always writes the comment file, so `--comment` is not part of the walkthrough.
-
-### Fixed
 
 ## [0.1.0-beta.13] – 2026-09-08
 
@@ -221,7 +241,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.14...HEAD
+[0.1.0-beta.14]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...v0.1.0-beta.14
 [0.1.0-beta.13]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...v0.1.0-beta.13
 [0.1.0-beta.12]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.11...v0.1.0-beta.12
 [0.1.0-beta.11]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.10...v0.1.0-beta.11

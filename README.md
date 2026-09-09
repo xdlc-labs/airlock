@@ -46,8 +46,8 @@ that needs a person. Walk through it below on the toy agent.
 Linux and macOS, `amd64` and `arm64`. Windows is not supported yet.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.13 bash
-# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.13
+curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.14 bash
+# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.14
 ```
 
 This is a public beta, so every release is a pre-release and GitHub's "latest"
