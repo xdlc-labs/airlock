@@ -2,6 +2,7 @@ package diff_test
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -271,5 +272,137 @@ func TestClampComment(t *testing.T) {
 		if strings.HasPrefix(row, "| ") && !strings.HasSuffix(row, "|") {
 			t.Fatalf("clamped mid-row: %q", row)
 		}
+	}
+}
+
+func TestUnlinkedChangeIsReportedAsUnknownRadius(t *testing.T) {
+	// A prompt discovered by file scan that no agent declares: the old report
+	// said "agents: none linked", which reads as "affects nothing".
+	mf := manifest.Manifest{
+		Agents:  []manifest.Agent{{ID: "support-bot", Prompts: []string{"declared"}}},
+		Prompts: []manifest.Prompt{{ID: "declared"}, {ID: "orphan", Path: "prompts/orphan.md"}},
+	}
+	base := &manifest.Snapshot{
+		ID:        "base",
+		Artifacts: []manifest.ArtifactRef{{Kind: "prompt", ID: "orphan", Hash: "aaa"}},
+		Manifest:  mf,
+	}
+	head := &manifest.Snapshot{
+		ID:        "head",
+		Artifacts: []manifest.ArtifactRef{{Kind: "prompt", ID: "orphan", Hash: "bbb"}},
+		Manifest:  mf,
+	}
+	r := diff.Compare(base, head)
+	if len(r.UnlinkedChanges) != 1 || r.UnlinkedChanges[0] != "prompt:orphan" {
+		t.Fatalf("UnlinkedChanges = %v, want [prompt:orphan]", r.UnlinkedChanges)
+	}
+	body := diff.FormatComment(r, "PASS")
+	if !strings.Contains(body, "blast radius is unknown") {
+		t.Fatalf("comment should not present an unlinked change as no impact, got:\n%s", body)
+	}
+	text := diff.FormatText(r)
+	if !strings.Contains(text, "unknown") {
+		t.Fatalf("terminal report should flag the unknown radius, got:\n%s", text)
+	}
+}
+
+func TestDeclaredChangeIsNotUnlinked(t *testing.T) {
+	mf := manifest.Manifest{
+		Agents:  []manifest.Agent{{ID: "support-bot", Prompts: []string{"p1"}}},
+		Prompts: []manifest.Prompt{{ID: "p1"}},
+	}
+	base := &manifest.Snapshot{
+		ID:        "base",
+		Artifacts: []manifest.ArtifactRef{{Kind: "prompt", ID: "p1", Hash: "aaa"}},
+		Manifest:  mf,
+	}
+	head := &manifest.Snapshot{
+		ID:        "head",
+		Artifacts: []manifest.ArtifactRef{{Kind: "prompt", ID: "p1", Hash: "bbb"}},
+		Manifest:  mf,
+	}
+	r := diff.Compare(base, head)
+	if len(r.UnlinkedChanges) != 0 {
+		t.Fatalf("a declared prompt must not be reported as unlinked, got %v", r.UnlinkedChanges)
+	}
+	if len(r.AffectedAgents) != 1 || r.AffectedAgents[0] != "support-bot" {
+		t.Fatalf("AffectedAgents = %v, want [support-bot]", r.AffectedAgents)
+	}
+}
+
+func TestAgentGainingAnMCPServerNeedsApproval(t *testing.T) {
+	// The MCP server is unchanged; only the agent's wiring grew. Before this the
+	// agent hash moved with no reason attached.
+	server := manifest.MCPServer{ID: "local-fs", SchemaHash: "same", Permissions: []string{"write"}}
+	base := &manifest.Snapshot{
+		ID: "base",
+		Artifacts: []manifest.ArtifactRef{
+			{Kind: "agent", ID: "support-bot", Hash: "agent-v1"},
+			{Kind: "mcp", ID: "local-fs", Hash: "mcp-v1"},
+		},
+		Manifest: manifest.Manifest{
+			Agents:     []manifest.Agent{{ID: "support-bot"}},
+			MCPServers: []manifest.MCPServer{server},
+		},
+	}
+	head := &manifest.Snapshot{
+		ID: "head",
+		Artifacts: []manifest.ArtifactRef{
+			{Kind: "agent", ID: "support-bot", Hash: "agent-v2"},
+			{Kind: "mcp", ID: "local-fs", Hash: "mcp-v1"},
+		},
+		Manifest: manifest.Manifest{
+			Agents:     []manifest.Agent{{ID: "support-bot", MCP: []string{"local-fs"}}},
+			MCPServers: []manifest.MCPServer{server},
+		},
+	}
+	r := diff.Compare(base, head)
+	if !r.NeedsApproval {
+		t.Fatalf("wiring an MCP server into an agent must need approval, got %+v", r)
+	}
+	want := "agent support-bot now uses mcp local-fs (needs review)"
+	if !slices.Contains(r.ApprovalReasons, want) {
+		t.Fatalf("ApprovalReasons = %v, want one saying %q", r.ApprovalReasons, want)
+	}
+}
+
+func TestAddedAgentDoesNotEnumerateItsWiring(t *testing.T) {
+	base := &manifest.Snapshot{ID: "base"}
+	head := &manifest.Snapshot{
+		ID: "head",
+		Artifacts: []manifest.ArtifactRef{
+			{Kind: "agent", ID: "new-bot", Hash: "agent-v1"},
+		},
+		Manifest: manifest.Manifest{
+			Agents: []manifest.Agent{{ID: "new-bot", MCP: []string{"local-fs"}, Tools: []string{"send_email"}}},
+		},
+	}
+	r := diff.Compare(base, head)
+	for _, reason := range r.ApprovalReasons {
+		if strings.Contains(reason, "now uses") {
+			t.Fatalf("a brand-new agent should not report per-link reasons, got %v", r.ApprovalReasons)
+		}
+	}
+}
+
+func TestAgentModelSwapNeedsApproval(t *testing.T) {
+	base := &manifest.Snapshot{
+		ID:        "base",
+		Artifacts: []manifest.ArtifactRef{{Kind: "agent", ID: "bot", Hash: "v1"}},
+		Manifest: manifest.Manifest{
+			Agents: []manifest.Agent{{ID: "bot", Models: []string{"model-gpt-4o"}}},
+		},
+	}
+	head := &manifest.Snapshot{
+		ID:        "head",
+		Artifacts: []manifest.ArtifactRef{{Kind: "agent", ID: "bot", Hash: "v2"}},
+		Manifest: manifest.Manifest{
+			Agents: []manifest.Agent{{ID: "bot", Models: []string{"model-claude-sonnet-4-5"}}},
+		},
+	}
+	r := diff.Compare(base, head)
+	want := "agent bot now uses model model-claude-sonnet-4-5 (needs review)"
+	if !slices.Contains(r.ApprovalReasons, want) {
+		t.Fatalf("ApprovalReasons = %v, want one saying %q", r.ApprovalReasons, want)
 	}
 }

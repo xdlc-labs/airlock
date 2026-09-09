@@ -8,6 +8,8 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+- Wiring an existing capability into an agent now raises `NEEDS_APPROVAL`. Adding an MCP server, write tool, skill, or a different model to an agent leaves that artifact's own hash untouched, so the only previous signal was the agent hash moving with no reason attached. Agents added in the same diff are left to the existing per-artifact reasons instead of enumerating every link.
+- Changed artifacts that no agent declares are reported as an unknown blast radius (`unlinked_changes` in the JSON, an `unknown` line in the terminal report, a note in the PR comment). A file-scanned prompt or Cursor rule that nothing links to used to render as "agents: none linked", which reads as "affects nothing" when it actually means eval selection could not narrow to it.
 
 ### Changed
 - The PR comment leads with what to do. When a change needs sign-off, the reasons and the `airlock approve` command now sit directly under the verdict instead of below the eval tables, where a reviewer had to scroll past the evidence to find the one command that unblocks the merge. The change table gained `where` and `hash` columns, so `~ prompt system-prompt` reads as `prompts/system.md` with the hash it moved from and to, and a folded Snapshots block names the two snapshots compared with the `airlock diff` that reproduces the comparison locally.
