@@ -30,6 +30,17 @@ func ImportFile(path string) ([]evalcase.Case, error) {
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("langsmith export: no examples")
 	}
+	out := casesFromRows(rows)
+	if len(out) == 0 {
+		return nil, fmt.Errorf("langsmith export: no usable rows")
+	}
+	return out, nil
+}
+
+// casesFromRows converts LangSmith example rows into eval cases. Shared by the
+// file export and the API pull so both produce the same cases for the same
+// examples. Rows with no usable input are dropped.
+func casesFromRows(rows []map[string]any) []evalcase.Case {
 	var out []evalcase.Case
 	for i, row := range rows {
 		in := stringify(row["inputs"])
@@ -63,10 +74,7 @@ func ImportFile(path string) ([]evalcase.Case, error) {
 		}
 		out = append(out, c)
 	}
-	if len(out) == 0 {
-		return nil, fmt.Errorf("langsmith export: no usable rows")
-	}
-	return out, nil
+	return out
 }
 
 func stringify(v any) string {
