@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,9 +13,13 @@ import (
 
 // Change is one artifact that added, removed, or changed hash.
 type Change struct {
-	Kind    string `json:"kind"`
-	ID      string `json:"id"`
-	Status  string `json:"status"` // added|removed|changed
+	Kind   string `json:"kind"`
+	ID     string `json:"id"`
+	Status string `json:"status"` // added|removed|changed
+	// Path is where the artifact came from: a file for prompts, skills, and
+	// evals, the config or lockfile that declared it otherwise. Empty when the
+	// manifest records no origin. Reviewers need it to find what moved.
+	Path    string `json:"path,omitempty"`
 	OldHash string `json:"old_hash,omitempty"`
 	NewHash string `json:"new_hash,omitempty"`
 }
@@ -67,6 +72,10 @@ func Compare(base, head *manifest.Snapshot) *Result {
 			r.Changes = append(r.Changes, Change{Kind: h.Kind, ID: h.ID, Status: "changed", OldHash: b.Hash, NewHash: h.Hash})
 			changedKeys[k] = true
 		}
+	}
+
+	for i := range r.Changes {
+		r.Changes[i].Path = artifactPath(&head.Manifest, &base.Manifest, r.Changes[i].Kind, r.Changes[i].ID)
 	}
 
 	r.AffectedAgents, r.AffectedEvals = blastRadius(&head.Manifest, changedKeys)
@@ -365,9 +374,35 @@ func commentGlyph(status string) string {
 	}
 }
 
+// CommentOptions carries what the comment cannot derive from the diff alone.
+type CommentOptions struct {
+	// ApproveCmd is the command that records the human decision. Given here so
+	// it sits with the reason the merge is blocked instead of below the eval
+	// tables the caller appends afterwards. Empty when approval is already on
+	// the ledger, or not needed.
+	ApproveCmd string
+}
+
+// MaxCommentBytes is GitHub's limit for one issue comment. A body over it is
+// rejected outright, so a gate that produced too much text would report nothing
+// at all.
+const MaxCommentBytes = 65536
+
+// commentMaxRows bounds the change table. A PR that rewrites a prompt library
+// should still leave the verdict and the reasons readable.
+const commentMaxRows = 30
+
 // FormatComment is the GitHub PR comment body. overall is PASS, FAIL,
 // NEEDS_APPROVAL, or INCONCLUSIVE. Empty overall is derived from the diff.
 func FormatComment(r *Result, overall string) string {
+	return FormatCommentWith(r, overall, CommentOptions{})
+}
+
+// FormatCommentWith is FormatComment with the caller's extras. The order is
+// deliberate: verdict, then what to do about it, then the detail. A reviewer who
+// reads only the first screen should still know whether the merge is blocked and
+// what unblocks it.
+func FormatCommentWith(r *Result, overall string, opt CommentOptions) string {
 	if overall == "" {
 		if r.NeedsApproval {
 			overall = "NEEDS_APPROVAL"
@@ -381,6 +416,7 @@ func FormatComment(r *Result, overall string) string {
 	b.WriteString("## Airlock\n\n")
 	fmt.Fprintf(&b, "> [!%s]\n> %s\n", alert, lead)
 	if len(r.Changes) == 0 {
+		b.WriteString(commentSnapshots(r))
 		return b.String()
 	}
 	agents := "none linked"
@@ -395,18 +431,78 @@ func FormatComment(r *Result, overall string) string {
 	fmt.Fprintf(&b, "| **%s** | %d | **%s** | **%s** |\n",
 		overall, len(r.Changes), agents, evals)
 
-	b.WriteString("\n### Changes\n\n")
-	b.WriteString("|  | kind | id |\n|:---:|---|---|\n")
-	for _, c := range r.Changes {
-		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` |\n", commentGlyph(c.Status), c.Kind, c.ID)
-	}
 	if r.NeedsApproval {
 		b.WriteString("\n### Why this is blocked\n\n")
 		for _, reason := range r.ApprovalReasons {
 			fmt.Fprintf(&b, "- %s\n", reason)
 		}
+		if opt.ApproveCmd != "" {
+			b.WriteString("\nA human has to sign off. Record it, then re-run the gate:\n\n")
+			fmt.Fprintf(&b, "```bash\n%s\n```\n", opt.ApproveCmd)
+		}
 	}
+
+	b.WriteString("\n### Changes\n\n")
+	b.WriteString("|  | kind | id | where | hash |\n|:---:|---|---|---|---|\n")
+	shown := r.Changes
+	if len(shown) > commentMaxRows {
+		shown = shown[:commentMaxRows]
+	}
+	for _, c := range shown {
+		fmt.Fprintf(&b, "| `%s` | `%s` | `%s` | %s | %s |\n",
+			commentGlyph(c.Status), c.Kind, c.ID, commentWhere(c), commentHash(c))
+	}
+	if rest := len(r.Changes) - len(shown); rest > 0 {
+		fmt.Fprintf(&b, "\n_%d more not shown. `airlock diff --base %s --head %s` lists them all._\n",
+			rest, r.BaseID, r.HeadID)
+	}
+	b.WriteString(commentSnapshots(r))
 	return b.String()
+}
+
+func commentWhere(c Change) string {
+	if c.Path == "" {
+		return "—"
+	}
+	return "`" + c.Path + "`"
+}
+
+func commentHash(c Change) string {
+	switch c.Status {
+	case "added":
+		return "`" + short(c.NewHash) + "`"
+	case "removed":
+		return "~~`" + short(c.OldHash) + "`~~"
+	default:
+		return fmt.Sprintf("`%s` → `%s`", short(c.OldHash), short(c.NewHash))
+	}
+}
+
+// commentSnapshots names the two snapshots compared and how to run the same
+// comparison locally, folded away because it is reference, not news.
+func commentSnapshots(r *Result) string {
+	return fmt.Sprintf("\n<details><summary>Snapshots</summary>\n\n"+
+		"base `%s` → head `%s`\n\n```bash\nairlock diff --base %s --head %s\n```\n</details>\n",
+		r.BaseID, r.HeadID, r.BaseID, r.HeadID)
+}
+
+// ClampComment trims a comment body to limit bytes, keeping the head of it, so an
+// oversized gate report still posts. It cuts on a line boundary and says that it
+// cut.
+func ClampComment(body string, limit int) string {
+	if limit <= 0 || len(body) <= limit {
+		return body
+	}
+	const note = "\n\n_Report truncated to fit one comment. Run `airlock ci` locally for the full report._\n"
+	keep := limit - len(note)
+	if keep < 0 {
+		return body[:limit]
+	}
+	cut := body[:keep]
+	if i := strings.LastIndexByte(cut, '\n'); i > 0 {
+		cut = cut[:i]
+	}
+	return cut + note
 }
 
 func short(h string) string {
@@ -419,4 +515,76 @@ func short(h string) string {
 // HasChanges reports whether any AI artifacts differ.
 func HasChanges(r *Result) bool {
 	return len(r.Changes) > 0
+}
+
+// artifactPath finds where an artifact lives, preferring the head manifest so a
+// moved file reports its new home, and falling back to base for removals.
+func artifactPath(head, base *manifest.Manifest, kind, id string) string {
+	if p := pathIn(head, kind, id); p != "" {
+		return p
+	}
+	return pathIn(base, kind, id)
+}
+
+func pathIn(m *manifest.Manifest, kind, id string) string {
+	if m == nil {
+		return ""
+	}
+	switch kind {
+	case "prompt":
+		for _, x := range m.Prompts {
+			if x.ID == id {
+				return cmp.Or(x.Path, x.RemoteRef, x.Source)
+			}
+		}
+	case "skill":
+		for _, x := range m.Skills {
+			if x.ID == id {
+				return cmp.Or(x.Path, x.Source)
+			}
+		}
+	case "eval":
+		for _, x := range m.Evals {
+			if x.ID == id {
+				return cmp.Or(x.Path, x.Source)
+			}
+		}
+	case "model":
+		for _, x := range m.Models {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	case "tool":
+		for _, x := range m.Tools {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	case "mcp":
+		for _, x := range m.MCPServers {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	case "env":
+		for _, x := range m.Envs {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	case "dependency":
+		for _, x := range m.Dependencies {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	case "agent":
+		for _, x := range m.Agents {
+			if x.ID == id {
+				return x.Source
+			}
+		}
+	}
+	return ""
 }

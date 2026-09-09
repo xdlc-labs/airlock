@@ -524,12 +524,15 @@ func cmdCI(args []string) error {
 	if dr.NeedsApproval && overall != policy.Fail {
 		overall = policy.NeedsApproval
 	}
-	body := diff.FormatComment(dr, string(overall)) + evalMD
 	unblock := ""
 	if dr.NeedsApproval && !approval.Has(store.ForRoot(root).Approvals, base.ID, head.ID) {
 		unblock = fmt.Sprintf("airlock approve --base %s --head %s", base.ID, head.ID)
-		body += fmt.Sprintf("\n### Unblock\n\n```\n%s\n```\n", unblock)
 	}
+	// The approve command goes into the comment beside the reasons, not after
+	// the eval tables: a reviewer should not have to scroll past evidence to
+	// find the one command that unblocks the merge.
+	body := diff.FormatCommentWith(dr, string(overall), diff.CommentOptions{ApproveCmd: unblock}) + evalMD
+	body = diff.ClampComment(body, diff.MaxCommentBytes)
 
 	p := store.ForRoot(root)
 	if err := p.Ensure(); err != nil {
