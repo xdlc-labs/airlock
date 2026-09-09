@@ -164,6 +164,24 @@ Adding a skill, widening a write tool, or a live MCP server growing a new tool i
 its `tools/list` all take the same path. `airlock approve` records the decision in
 a ledger so the next run knows a human said yes.
 
+### Reading tool lists from stdio MCP servers
+
+Servers with an `http(s)` url are asked for their `tools/list` on every scan. A
+server configured with a `command` has to be started to answer, so `init`,
+`snapshot`, `diff`, and `ci` only do that when you pass `--mcp-stdio`:
+
+```bash
+airlock snapshot --mcp-stdio
+```
+
+**This runs the commands in your MCP config**, with this process's environment,
+from the repository root. Do not enable it on a workflow that builds pull
+requests from forks: the command comes from the branch under test. Probing on a
+machine you trust and committing the resulting `.airlock/manifest.json` gives CI
+the tool list without CI ever starting a server. Without the flag a stdio server
+is tracked by its config hash, exactly as before, so a changed `command` or
+`args` is still caught.
+
 The full walkthrough, including `--mode live`, judges, drift, and the production
 loop, is in the [developer guide](https://xdlc.dev/airlock/docs/guide).
 
@@ -266,6 +284,10 @@ re-pinning a known-good release. `sentinel` fingerprints upstream models so you
 notice when a provider changes one under a stable name. `ingest otel`, `baseline`,
 and `drift` close the loop from production. `history --serve` gives you a
 read-only local UI.
+
+`--mcp-stdio` on `init`, `snapshot`, `diff`, and `ci` starts stdio MCP servers to
+read their live tool list. It is off by default because that runs the commands
+your MCP config names.
 
 Discovery covers APM lockfiles, Agent Skills, Cursor rules, agent instruction
 files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`,

@@ -15,8 +15,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Scan discovers AI artifacts under root and returns a Manifest.
+// Scan discovers AI artifacts under root and returns a Manifest. It only reads
+// files and http(s) MCP endpoints; see ScanWith for behavior that has to be
+// opted into.
 func Scan(root string) (*manifest.Manifest, error) {
+	return ScanWith(root, Options{})
+}
+
+// ScanWith discovers AI artifacts under root with opt applied.
+func ScanWith(root string, opt Options) (*manifest.Manifest, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -53,7 +60,7 @@ func Scan(root string) (*manifest.Manifest, error) {
 		return nil, fmt.Errorf("framework-stack: %w", err)
 	}
 	if len(mcpConfigs) > 0 {
-		enrichMCPSchemas(context.Background(), nil, m, mcpConfigs)
+		enrichMCPSchemas(context.Background(), nil, m, mcpConfigs, opt)
 	}
 	if err := scanModelHeuristics(abs, m); err != nil {
 		return nil, fmt.Errorf("models: %w", err)
