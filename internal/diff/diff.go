@@ -26,11 +26,16 @@ type Change struct {
 
 // Result is a static blast-radius diff between two snapshots.
 type Result struct {
-	BaseID          string   `json:"base_id"`
-	HeadID          string   `json:"head_id"`
-	Changes         []Change `json:"changes"`
-	AffectedAgents  []string `json:"affected_agents"`
-	AffectedEvals   []string `json:"affected_evals"`
+	BaseID         string   `json:"base_id"`
+	HeadID         string   `json:"head_id"`
+	Changes        []Change `json:"changes"`
+	AffectedAgents []string `json:"affected_agents"`
+	AffectedEvals  []string `json:"affected_evals"`
+	// UnlinkedChanges names changed artifacts that reach no agent in either
+	// manifest. Their blast radius is unknown, not empty: nothing declared who
+	// uses them, so eval selection cannot narrow to them and a reader must not
+	// read "agents: none linked" as "affects nothing".
+	UnlinkedChanges []string `json:"unlinked_changes,omitempty"`
 	NeedsApproval   bool     `json:"needs_approval"`
 	ApprovalReasons []string `json:"approval_reasons,omitempty"`
 }
@@ -87,12 +92,98 @@ func Compare(base, head *manifest.Snapshot) *Result {
 		r.AffectedAgents = xslices.UniqueSorted(append(r.AffectedAgents, a2...))
 		r.AffectedEvals = xslices.UniqueSorted(append(r.AffectedEvals, e2...))
 	}
+	r.UnlinkedChanges = unlinkedChanges(&head.Manifest, &base.Manifest, r.Changes)
+
 	r.NeedsApproval, r.ApprovalReasons = permissionExpansion(base, head, r.Changes)
 	if depNeeds, depReasons := dependencyExpansion(r.Changes); depNeeds {
 		r.NeedsApproval = true
 		r.ApprovalReasons = xslices.UniqueSorted(append(r.ApprovalReasons, depReasons...))
 	}
+	if wireNeeds, wireReasons := agentWiringExpansion(base, head, r.Changes); wireNeeds {
+		r.NeedsApproval = true
+		r.ApprovalReasons = xslices.UniqueSorted(append(r.ApprovalReasons, wireReasons...))
+	}
 	return r
+}
+
+// unlinkedChanges lists changed artifacts that no agent declares. Kinds that are
+// not wiring targets (agents themselves, evals, envs, and packages) are left
+// out: an agent does not "use" them, so silence about them means nothing.
+func unlinkedChanges(head, base *manifest.Manifest, changes []Change) []string {
+	linked := map[string]bool{}
+	for _, m := range []*manifest.Manifest{head, base} {
+		if m == nil {
+			continue
+		}
+		for _, a := range m.Agents {
+			for kind, ids := range map[string][]string{
+				"model": a.Models, "prompt": a.Prompts,
+				"tool": a.Tools, "skill": a.Skills, "mcp": a.MCP,
+			} {
+				for _, id := range ids {
+					linked[kind+":"+id] = true
+				}
+			}
+		}
+	}
+	var out []string
+	for _, c := range changes {
+		switch c.Kind {
+		case "agent", "eval", "env", "dependency":
+			continue
+		}
+		if !linked[c.Kind+":"+c.ID] {
+			out = append(out, c.Kind+":"+c.ID)
+		}
+	}
+	return xslices.UniqueSorted(out)
+}
+
+// agentWiringExpansion flags an agent that gained a capability by wiring, not by
+// the capability itself changing. Attaching an existing MCP server or write tool
+// to an agent leaves that artifact's hash untouched, so before this the only
+// signal was the agent's own hash moving, with no reason attached to it. Agents
+// added in this diff are skipped: their parts show up as added artifacts, which
+// permissionExpansion already reasons about.
+func agentWiringExpansion(base, head *manifest.Snapshot, changes []Change) (bool, []string) {
+	baseAgents := map[string]manifest.Agent{}
+	for _, a := range base.Manifest.Agents {
+		baseAgents[a.ID] = a
+	}
+	var reasons []string
+	for _, c := range changes {
+		if c.Kind != "agent" || c.Status != "changed" {
+			continue
+		}
+		old, had := baseAgents[c.ID]
+		if !had {
+			continue
+		}
+		for _, a := range head.Manifest.Agents {
+			if a.ID != c.ID {
+				continue
+			}
+			for _, w := range []struct {
+				kind string
+				was  []string
+				now  []string
+			}{
+				{"mcp", old.MCP, a.MCP},
+				{"tool", old.Tools, a.Tools},
+				{"skill", old.Skills, a.Skills},
+				{"model", old.Models, a.Models},
+			} {
+				for _, id := range w.now {
+					if slices.Contains(w.was, id) {
+						continue
+					}
+					reasons = append(reasons,
+						fmt.Sprintf("agent %s now uses %s %s (needs review)", a.ID, w.kind, id))
+				}
+			}
+		}
+	}
+	return len(reasons) > 0, xslices.UniqueSorted(reasons)
 }
 
 // dependencyExpansion flags a new (non-AI) package dependency landing in the
@@ -338,6 +429,10 @@ func FormatText(r *Result) string {
 	if len(r.AffectedEvals) > 0 {
 		lines = append(lines, "  evals   "+strings.Join(r.AffectedEvals, ", "))
 	}
+	if len(r.UnlinkedChanges) > 0 {
+		lines = append(lines, "  unknown "+strings.Join(r.UnlinkedChanges, ", "),
+			"          (no agent declares these; blast radius is unknown, not empty)")
+	}
 	if r.NeedsApproval {
 		lines = append(lines, "")
 		for _, reason := range r.ApprovalReasons {
@@ -455,6 +550,11 @@ func FormatCommentWith(r *Result, overall string, opt CommentOptions) string {
 	if rest := len(r.Changes) - len(shown); rest > 0 {
 		fmt.Fprintf(&b, "\n_%d more not shown. `airlock diff --base %s --head %s` lists them all._\n",
 			rest, r.BaseID, r.HeadID)
+	}
+	if len(r.UnlinkedChanges) > 0 {
+		fmt.Fprintf(&b, "\n> [!NOTE]\n> No agent declares `%s`, so the blast radius is unknown rather than"+
+			" empty and eval selection could not narrow to it. Declaring it in `apm.lock.yaml` gates it properly.\n",
+			strings.Join(r.UnlinkedChanges, "`, `"))
 	}
 	b.WriteString(commentSnapshots(r))
 	return b.String()
