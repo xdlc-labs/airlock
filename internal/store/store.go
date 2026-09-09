@@ -93,7 +93,19 @@ func WritePolicyStub(p Paths) error {
 	}
 	stub := `# Airlock policy
 version: 1
-fail_on_ai_change: false
+
+# Gates that block a merge. New repos start fail-closed: a change that needs
+# human sign-off, or evals that fail or stay inconclusive, stops the merge
+# without any workflow having to pass --fail-on-* flags. Turn one off here if
+# you mean to, so the choice is in review rather than in a workflow file.
+fail_on:
+  approval: true
+  eval: true
+  inconclusive: true
+  sentinel: true
+  # Blocks every AI-artifact change, approved or not. Strictest setting; off.
+  ai_change: false
+
 data_boundary:
   fail_on_pii: false
 gates:
@@ -163,24 +175,6 @@ func LatestSnapshotID(p Paths) (string, error) {
 		return strings.Compare(b.id, a.id)
 	})
 	return items[0].id, nil
-}
-
-func ReadPolicyFailOnChange(p Paths) bool {
-	data, err := os.ReadFile(p.Policy)
-	if err != nil {
-		return false
-	}
-	for line := range strings.SplitSeq(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if after, ok := strings.CutPrefix(line, "fail_on_ai_change:"); ok {
-			v := strings.TrimSpace(after)
-			return v == "true" || v == "yes" || v == "1"
-		}
-	}
-	return false
 }
 
 func writeJSON(path string, v any) error {
