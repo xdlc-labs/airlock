@@ -42,6 +42,9 @@ func Scan(root string) (*manifest.Manifest, error) {
 	if err := scanCursorRules(abs, m); err != nil {
 		return nil, fmt.Errorf("cursor-rules: %w", err)
 	}
+	if err := scanInstructionFiles(abs, m); err != nil {
+		return nil, fmt.Errorf("instructions: %w", err)
+	}
 	mcpConfigs, err := scanMCP(abs, m)
 	if err != nil {
 		return nil, fmt.Errorf("mcp: %w", err)
@@ -536,6 +539,7 @@ func scanMCP(root string, m *manifest.Manifest) (map[string]json.RawMessage, err
 	candidates := []string{
 		"mcp.json", ".mcp.json", ".cursor/mcp.json",
 		"claude_desktop_config.json", ".vscode/mcp.json",
+		".windsurf/mcp.json", ".gemini/settings.json", ".zed/settings.json",
 	}
 	for _, c := range candidates {
 		path := filepath.Join(root, c)
@@ -561,8 +565,11 @@ func scanMCP(root string, m *manifest.Manifest) (map[string]json.RawMessage, err
 		for k, v := range collectMCPConfigs(raw) {
 			configs[k] = v
 		}
-		// Claude Desktop / Cursor style: mcpServers map
-		if serversRaw, ok := raw["mcpServers"]; ok {
+		// Claude Desktop / Cursor style: mcpServers map. VS Code and Zed spell
+		// the same map "servers", and hashing that file whole left its servers
+		// with no per-server identity, no live tool list, and so no permission
+		// expansion signal at all.
+		if serversRaw, ok := mcpServersKey(raw); ok {
 			var servers map[string]any
 			if err := json.Unmarshal(serversRaw, &servers); err == nil {
 				for name, cfg := range servers {

@@ -237,7 +237,9 @@ notice when a provider changes one under a stable name. `ingest otel`, `baseline
 and `drift` close the loop from production. `history --serve` gives you a
 read-only local UI.
 
-Discovery covers APM lockfiles, Agent Skills, Cursor rules, MCP configs, prompt
+Discovery covers APM lockfiles, Agent Skills, Cursor rules, agent instruction
+files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`,
+Copilot instructions, `.claude/agents/*.md`), MCP configs, prompt
 files, Promptfoo suites, `go.sum`, `package-lock.json`, `pnpm-lock.yaml`,
 `yarn.lock`, `Cargo.lock`, `poetry.lock`, `Pipfile.lock`, `uv.lock`, and
 heuristics for the OpenAI SDK, the Anthropic SDK, LangGraph, LlamaIndex, CrewAI,
