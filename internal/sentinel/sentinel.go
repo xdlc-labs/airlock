@@ -4,6 +4,7 @@ package sentinel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,6 +24,10 @@ var probePrompt = providers.Message{
 	Content: "Reply with exactly the string AIRLOCK_SENTINEL_v1 and nothing else.",
 }
 
+// ErrNoProbe marks a model whose provider Airlock cannot probe. A sweep skips
+// those models instead of failing, so one exotic model does not stop the rest.
+var ErrNoProbe = errors.New("no probe support for provider")
+
 // Record is a stored fingerprint for one manifest model.
 type Record struct {
 	ModelID     string    `json:"model_id"`
@@ -37,6 +42,9 @@ type Record struct {
 type Store struct {
 	Version int      `json:"version"`
 	Records []Record `json:"records"`
+	// Skipped holds the model ids the last sweep could not probe. In memory only:
+	// it describes a run, not the ledger.
+	Skipped []string `json:"-"`
 }
 
 // Drift is live vs stored fingerprint mismatch for the same config model string.
@@ -53,6 +61,7 @@ type Drift struct {
 type CheckReport struct {
 	Drifts    []Drift  `json:"drifts,omitempty"`
 	Missing   []string `json:"missing,omitempty"` // model ids with no stored fingerprint
+	Skipped   []string `json:"skipped,omitempty"` // model ids whose provider has no probe support
 	Probed    int      `json:"probed"`
 	Unchanged int      `json:"unchanged"`
 }
@@ -106,14 +115,14 @@ func indexStore(s *Store) map[string]Record {
 func ProbeModel(ctx context.Context, m manifest.Model, client providers.HTTPDoer) (Record, error) {
 	providerName := m.Provider
 	if providerName == "" {
-		providerName = guessProvider(m.Model)
+		providerName = manifest.GuessProvider(m.Model)
 	}
 	if providerName == "" {
 		providerName = "mock"
 	}
 	p, err := providers.Resolve(providerName, client)
 	if err != nil {
-		return Record{}, err
+		return Record{}, fmt.Errorf("%w: %s", ErrNoProbe, providerName)
 	}
 	seed := int64(42)
 	resp, err := p.Generate(ctx, providers.Request{
@@ -162,6 +171,10 @@ func ProbeAll(ctx context.Context, m *manifest.Manifest, client providers.HTTPDo
 	out := &Store{Version: storeVersion}
 	for _, mod := range m.Models {
 		rec, err := ProbeModel(ctx, mod, client)
+		if errors.Is(err, ErrNoProbe) {
+			out.Skipped = append(out.Skipped, mod.ID)
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -187,6 +200,10 @@ func Check(ctx context.Context, m *manifest.Manifest, client providers.HTTPDoer,
 	rep := &CheckReport{}
 	for _, mod := range m.Models {
 		live, err := ProbeModel(ctx, mod, client)
+		if errors.Is(err, ErrNoProbe) {
+			rep.Skipped = append(rep.Skipped, mod.ID)
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -234,18 +251,6 @@ func configHash(m manifest.Model) string {
 	return manifest.HashString(m.Provider + "|" + m.Model)
 }
 
-func guessProvider(model string) string {
-	l := strings.ToLower(model)
-	switch {
-	case strings.Contains(l, "claude"):
-		return "anthropic"
-	case strings.Contains(l, "gpt"), strings.HasPrefix(l, "o1"), strings.HasPrefix(l, "o3"):
-		return "openai"
-	default:
-		return ""
-	}
-}
-
 // HasDrift reports whether any config-stable fingerprint changed.
 func (r *CheckReport) HasDrift() bool {
 	return r != nil && len(r.Drifts) > 0
@@ -257,8 +262,8 @@ func FormatText(r *CheckReport) string {
 		return "sentinel: no report\n"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "sentinel: probed=%d unchanged=%d drifts=%d missing=%d\n",
-		r.Probed, r.Unchanged, len(r.Drifts), len(r.Missing))
+	fmt.Fprintf(&b, "sentinel: probed=%d unchanged=%d drifts=%d missing=%d skipped=%d\n",
+		r.Probed, r.Unchanged, len(r.Drifts), len(r.Missing), len(r.Skipped))
 	for _, d := range r.Drifts {
 		tag := "fingerprint changed"
 		if d.ConfigMatch {
@@ -269,6 +274,9 @@ func FormatText(r *CheckReport) string {
 	}
 	for _, id := range r.Missing {
 		fmt.Fprintf(&b, "  MISSING stored fingerprint for %s\n", id)
+	}
+	for _, id := range r.Skipped {
+		fmt.Fprintf(&b, "  SKIPPED %s: no probe support for its provider\n", id)
 	}
 	return b.String()
 }

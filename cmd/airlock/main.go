@@ -1188,8 +1188,14 @@ func runSentinelProbe(root string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	_, err = sentinel.ProbeAll(ctx, m, providers.DefaultHTTPClient(), sentinel.DefaultPath(root))
-	return err
+	st, err := sentinel.ProbeAll(ctx, m, providers.DefaultHTTPClient(), sentinel.DefaultPath(root))
+	if err != nil {
+		return err
+	}
+	for _, id := range st.Skipped {
+		fmt.Printf("Skipped %s: no probe support for its provider\n", id)
+	}
+	return nil
 }
 
 func runSentinelCheck(root string) (*sentinel.CheckReport, error) {
