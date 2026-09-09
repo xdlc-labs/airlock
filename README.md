@@ -191,12 +191,27 @@ if you would rather move deliberately. The Action diffs merge-base against HEAD,
 writes `.airlock/ci-comment.md`, and comments on the pull request. It fails closed
 on permission expansion by default.
 
-`airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. Its
-default mins are strict on purpose: a `0.99` gate needs at least 381 clean samples
-before a 95% interval can clear it, so if you leave the sample budget low that
-gate will report `INCONCLUSIVE` forever. Airlock now tells you the number it
-needs. Raise `max_samples_per_case`, lower the min, or add
-`--fail-on-inconclusive` so an undecided gate blocks instead of passing quietly.
+`airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. It
+starts fail-closed:
+
+```yaml
+fail_on:
+  approval: true      # a change needing human sign-off blocks the merge
+  eval: true          # a failing eval gate blocks the merge
+  inconclusive: true  # an undecided gate blocks instead of passing quietly
+  sentinel: true      # silent provider drift blocks the merge
+  ai_change: false    # strictest: block every AI-artifact change
+```
+
+Gates live in the file so a workflow cannot forget them; the `--fail-on-*` flags
+still work and still win, since a flag can only turn a gate on. A repo whose
+policy predates this block keeps its old behavior and says so once per run.
+
+The default mins are strict on purpose: a `0.99` gate needs at least 381 clean
+samples before a 95% interval can clear it, so if you leave the sample budget low
+that gate will report `INCONCLUSIVE` forever. Airlock now tells you the number it
+needs. Raise `max_samples_per_case`, lower the min, or leave
+`fail_on.inconclusive` on so an undecided gate blocks instead of passing quietly.
 
 ## What it gates, and what it does not
 

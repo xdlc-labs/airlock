@@ -118,6 +118,7 @@ Commands:
 
 test flags: --path --suite --affected --mode --json --baseline-results ID --adversarial
 ci flags:   --fail-on-change --fail-on-eval --fail-on-inconclusive --fail-on-approval --fail-on-sentinel --comment --skip-eval --adversarial
+            (or set them once in .airlock/policy.yml under fail_on:)
 redact:     --redact pii|hash|off (ingest / baseline)
 
 Local-first. Nothing uploads.
@@ -457,6 +458,25 @@ func cmdCI(args []string) error {
 		headID = "working"
 	}
 
+	// Policy can turn gates into blockers so a repo keeps them on without every
+	// workflow repeating the flags. A flag still forces a gate on; policy never
+	// switches one off.
+	gatePolicy, polErr := policy.Load(store.ForRoot(root).Policy)
+	if polErr != nil {
+		return fmt.Errorf("policy: %w", polErr)
+	}
+	anyFlag := failFlag || failEval || failInconclusive || failApproval || failSentinel
+	failFlag = failFlag || gatePolicy.FailOnChange()
+	failEval = failEval || gatePolicy.FailOnEval()
+	failInconclusive = failInconclusive || gatePolicy.FailOnInconclusive()
+	failApproval = failApproval || gatePolicy.FailOnApproval()
+	failSentinel = failSentinel || gatePolicy.FailOnSentinel()
+	if !anyFlag && !gatePolicy.FailOn.Configured() && !gatePolicy.FailOnAIChange {
+		out.Warn("no fail_on block in .airlock/policy.yml and no --fail-on-* flag: " +
+			"this run reports but cannot block a merge. Add fail_on: {approval: true, eval: true, " +
+			"inconclusive: true} to gate it (airlock init writes that for new repos).")
+	}
+
 	base, err := snapshot.Load(root, baseID)
 	if err != nil {
 		return fmt.Errorf("base: %w", err)
@@ -476,7 +496,7 @@ func cmdCI(args []string) error {
 	if !skipEval {
 		suite, cases, lerr := resolveCasesForDiff(root, dr, adversarial, secSurface, mcpTouched, skillTouched)
 		if lerr == nil && len(cases) > 0 {
-			pol, _ := policy.Load(store.ForRoot(root).Policy)
+			pol := gatePolicy
 			client, _ := buildHTTPClient(root, suite, suite.Mode)
 			cfg := evaluation.Config{Suite: suite, Policy: pol, Client: client, SnapshotID: head.ID}
 			if bres, err := evaluation.FindBaseline(store.ForRoot(root).Results, base.ID); err == nil {
@@ -561,8 +581,7 @@ func cmdCI(args []string) error {
 
 	// Fail-closed checks below MUST run regardless of --comment: writing a PR
 	// comment is not an escape hatch from the gate.
-	fail := failFlag || store.ReadPolicyFailOnChange(store.ForRoot(root))
-	if fail && diff.HasChanges(dr) {
+	if failFlag && diff.HasChanges(dr) {
 		return fmt.Errorf("AI artifacts changed (fail_on_ai_change)")
 	}
 	if err := evalGateErr(evalReport, failEval, failInconclusive); err != nil {

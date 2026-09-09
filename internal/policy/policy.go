@@ -25,11 +25,53 @@ const (
 )
 
 type Policy struct {
-	Version        int                 `yaml:"version"`
+	Version int `yaml:"version"`
+	// FailOnAIChange predates FailOn and still works. FailOn.AIChange wins when
+	// both are set.
 	FailOnAIChange bool                `yaml:"fail_on_ai_change"`
+	FailOn         FailOn              `yaml:"fail_on"`
 	Gates          map[string]GateSpec `yaml:"gates"`
 	Budgets        Budgets             `yaml:"budgets"`
 	DataBoundary   DataBoundary        `yaml:"data_boundary"`
+}
+
+// FailOn turns gate outcomes into merge blockers from the policy file, so a repo
+// keeps them on without every workflow remembering the --fail-on-* flags. A
+// flag still forces a gate on; the policy cannot switch one off.
+//
+// Every field is a pointer so an unset gate is distinguishable from one set to
+// false: a repo whose policy predates this block keeps behaving exactly as it
+// did, and only says so once (see Configured).
+type FailOn struct {
+	Approval     *bool `yaml:"approval"`
+	Eval         *bool `yaml:"eval"`
+	Inconclusive *bool `yaml:"inconclusive"`
+	Sentinel     *bool `yaml:"sentinel"`
+	AIChange     *bool `yaml:"ai_change"`
+}
+
+// Configured reports whether the policy says anything at all about failing
+// closed, by either the current block or the older single key.
+func (f FailOn) Configured() bool {
+	return f.Approval != nil || f.Eval != nil || f.Inconclusive != nil ||
+		f.Sentinel != nil || f.AIChange != nil
+}
+
+func on(v *bool) bool { return v != nil && *v }
+
+// FailOnApproval and friends report the policy's answer for one gate.
+func (p Policy) FailOnApproval() bool     { return on(p.FailOn.Approval) }
+func (p Policy) FailOnEval() bool         { return on(p.FailOn.Eval) }
+func (p Policy) FailOnInconclusive() bool { return on(p.FailOn.Inconclusive) }
+func (p Policy) FailOnSentinel() bool     { return on(p.FailOn.Sentinel) }
+
+// FailOnChange answers for AI-artifact changes, honoring the older
+// fail_on_ai_change key when the newer one is unset.
+func (p Policy) FailOnChange() bool {
+	if p.FailOn.AIChange != nil {
+		return *p.FailOn.AIChange
+	}
+	return p.FailOnAIChange
 }
 
 // DataBoundary fails a release when PII/secret patterns appear in model I/O.
