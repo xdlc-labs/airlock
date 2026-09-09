@@ -153,10 +153,22 @@ func truncateMCP(b []byte) string {
 	return string(b[:120]) + "..."
 }
 
+// mcpServersKey returns the server map under whichever key this config style
+// uses: "mcpServers" for Claude Desktop, Cursor, and Gemini, "servers" for VS
+// Code and Zed.
+func mcpServersKey(raw map[string]json.RawMessage) (json.RawMessage, bool) {
+	for _, key := range []string{"mcpServers", "servers", "context_servers"} {
+		if v, ok := raw[key]; ok {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
 // collectMCPConfigs gathers per-server raw JSON from parsed mcp config files.
 func collectMCPConfigs(raw map[string]json.RawMessage) map[string]json.RawMessage {
 	out := map[string]json.RawMessage{}
-	if serversRaw, ok := raw["mcpServers"]; ok {
+	if serversRaw, ok := mcpServersKey(raw); ok {
 		var servers map[string]json.RawMessage
 		if err := json.Unmarshal(serversRaw, &servers); err == nil {
 			for name, cfg := range servers {
