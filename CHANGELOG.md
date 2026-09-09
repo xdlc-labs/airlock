@@ -8,6 +8,28 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 ## [Unreleased]
 
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.1.0-beta.15] – 2026-09-09
+
+Fail-closed policy, more discovery, and a PR comment that leads with what to do.
+Pin `uses: xdlc-labs/airlock@v0` or `@v0.1.0-beta.15`.
+
+### Highlights
+- New repos get `fail_on:` in `policy.yml`, so gates block without repeating workflow flags.
+- Instruction files (`CLAUDE.md`, `AGENTS.md`, Copilot, …) are discovered as prompts.
+- Wiring an existing MCP server or tool into an agent now needs approval.
+- LangSmith datasets can be pulled over the API. Stdio MCP tool lists are opt-in behind `--mcp-stdio`.
+
+### Known limits
+- Windows install not supported yet
+- Comparative gates still report `SKIPPED` until a baseline exists
+- `--mcp-stdio` starts the server. Keep it off on workflows that build fork pull requests.
+
+### Added
 - Wiring an existing capability into an agent now raises `NEEDS_APPROVAL`. Adding an MCP server, write tool, skill, or a different model to an agent leaves that artifact's own hash untouched, so the only previous signal was the agent hash moving with no reason attached. Agents added in the same diff are left to the existing per-artifact reasons instead of enumerating every link.
 - Changed artifacts that no agent declares are reported as an unknown blast radius (`unlinked_changes` in the JSON, an `unknown` line in the terminal report, a note in the PR comment). A file-scanned prompt or Cursor rule that nothing links to used to render as "agents: none linked", which reads as "affects nothing" when it actually means eval selection could not narrow to it.
 - Agent instruction files are discovered as prompts: `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.windsurfrules`, `.github/copilot-instructions.md`, `.github/instructions/*.md`, and `.claude/agents/*.md`, nested copies included. These reach the model on every turn and are the files people actually edit, and until now editing one produced no diff at all. Vendored and fixture copies (`node_modules`, `testdata`, `.venv`, `third_party`, …) are skipped, and a file already declared in `apm.lock.yaml` is not duplicated.
@@ -20,8 +42,6 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 - The PR comment leads with what to do. When a change needs sign-off, the reasons and the `airlock approve` command now sit directly under the verdict instead of below the eval tables, where a reviewer had to scroll past the evidence to find the one command that unblocks the merge. The change table gained `where` and `hash` columns, so `~ prompt system-prompt` reads as `prompts/system.md` with the hash it moved from and to, and a folded Snapshots block names the two snapshots compared with the `airlock diff` that reproduces the comparison locally.
 - The PR comment is bounded: at most 30 change rows (with a count of what was left out) and a hard clamp at GitHub's 65536-byte comment limit. A gate report over that limit was rejected by the API, so a large PR could produce no comment at all.
 - `fail_on_ai_change` is still honored, now read through the policy loader rather than a hand-rolled line scanner in `store`. `fail_on.ai_change` wins when both are set.
-
-### Fixed
 
 ## [0.1.0-beta.14] – 2026-09-09
 
@@ -251,7 +271,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.14...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.15...HEAD
+[0.1.0-beta.15]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.14...v0.1.0-beta.15
 [0.1.0-beta.14]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...v0.1.0-beta.14
 [0.1.0-beta.13]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...v0.1.0-beta.13
 [0.1.0-beta.12]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.11...v0.1.0-beta.12
