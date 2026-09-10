@@ -83,7 +83,12 @@ type MCPServer struct {
 	// diff.permissionExpansion catch capability growth (a genuinely new tool
 	// appearing on the server) even when nobody declared it in Permissions.
 	ToolNames []string `json:"tool_names,omitempty"`
-	Source    string   `json:"source,omitempty"`
+	// ConfigHash is the hash of the server's config entry, kept when a stdio
+	// probe replaces SchemaHash with the live schema. A later scan that does
+	// not probe can then tell whether a committed manifest's tool list still
+	// describes this config (see enrichMCPSchemas) instead of dropping it.
+	ConfigHash string `json:"config_hash,omitempty"`
+	Source     string `json:"source,omitempty"`
 }
 
 // Dependency is a non-AI package dependency (npm/pip/go/etc) tracked for the

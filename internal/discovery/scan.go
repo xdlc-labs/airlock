@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/xdlc-labs/airlock/internal/manifest"
+	"github.com/xdlc-labs/airlock/internal/store"
 	"gopkg.in/yaml.v3"
 )
 
@@ -61,6 +62,9 @@ func ScanWith(root string, opt Options) (*manifest.Manifest, error) {
 	}
 	if len(mcpConfigs) > 0 {
 		enrichMCPSchemas(context.Background(), nil, m, mcpConfigs, opt)
+		if prior, err := store.ReadManifest(store.ForRoot(abs)); err == nil {
+			carryStdioToolLists(m, prior, opt)
+		}
 	}
 	if err := scanModelHeuristics(abs, m); err != nil {
 		return nil, fmt.Errorf("models: %w", err)

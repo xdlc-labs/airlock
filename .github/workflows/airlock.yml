@@ -3,6 +3,9 @@ name: Airlock
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # A review is what unblocks a NEEDS_APPROVAL, so re-run when one lands.
+  pull_request_review:
+    types: [submitted, dismissed]
   workflow_dispatch:
 
 permissions:

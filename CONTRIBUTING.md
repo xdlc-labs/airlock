@@ -41,7 +41,7 @@ go build -o airlock ./cmd/airlock
 
 ## Releases
 
-Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `vX.Y.Z` on `main` (pattern `v*.*.*`, so the moving `v0` tag does not publish a release) → Release workflow publishes binaries for `install.sh`.
+Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `vX.Y.Z` on `main` (pattern `v*.*.*`, so the moving `v1` tag does not publish a release) → Release workflow publishes binaries for `install.sh`.
 
 ## Scope guidance
 
@@ -52,7 +52,7 @@ Maintainers: see [docs/RELEASING.md](docs/RELEASING.md). Tag `vX.Y.Z` on `main` 
 | Discovery: skills, Cursor rules, APM / Promptfoo / OTel | Competing with APM install-time features |
 | CI gate / approval hardening | Every framework plugin at once, unit-test selection for app CI |
 
-Airlock **imports** APM lockfiles. It does not re-implement APM resolution. Roadmap: [xdlc.dev/airlock/docs/roadmap](https://xdlc.dev/airlock/docs/roadmap).
+Airlock **imports** APM lockfiles. It does not re-implement APM resolution. A hosted control plane, SSO, and an autonomic rollback agent are out of scope for this repository; open an issue before starting on anything of that shape.
 
 ## License
 

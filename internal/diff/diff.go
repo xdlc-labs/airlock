@@ -476,6 +476,12 @@ type CommentOptions struct {
 	// tables the caller appends afterwards. Empty when approval is already on
 	// the ledger, or not needed.
 	ApproveCmd string
+	// ReviewUnblock says the sign-off is a pull request review rather than a
+	// ledger entry, so the comment asks for a review and not for a command.
+	ReviewUnblock bool
+	// ApprovedBy names who has already signed off, and how. Empty when nobody
+	// has, or when approval is not needed.
+	ApprovedBy string
 }
 
 // MaxCommentBytes is GitHub's limit for one issue comment. A body over it is
@@ -531,7 +537,13 @@ func FormatCommentWith(r *Result, overall string, opt CommentOptions) string {
 		for _, reason := range r.ApprovalReasons {
 			fmt.Fprintf(&b, "- %s\n", reason)
 		}
-		if opt.ApproveCmd != "" {
+		switch {
+		case opt.ApprovedBy != "":
+			fmt.Fprintf(&b, "\nSigned off by %s. The gate treats this change as approved.\n", opt.ApprovedBy)
+		case opt.ReviewUnblock:
+			b.WriteString("\nA human has to sign off. Approve this pull request as a reviewer with write access" +
+				" and the gate re-runs. The review has to be on the current commit: a new push asks again.\n")
+		case opt.ApproveCmd != "":
 			b.WriteString("\nA human has to sign off. Record it, then re-run the gate:\n\n")
 			fmt.Fprintf(&b, "```bash\n%s\n```\n", opt.ApproveCmd)
 		}

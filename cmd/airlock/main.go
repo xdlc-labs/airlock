@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -120,6 +121,10 @@ Commands:
 test flags: --path --suite --affected --mode --json --baseline-results ID --adversarial
 ci flags:   --fail-on-change --fail-on-eval --fail-on-inconclusive --fail-on-approval --fail-on-sentinel --comment --skip-eval --adversarial
             (or set them once in .airlock/policy.yml under fail_on:)
+            --github-approvals [--pr N] takes an approving pull request review on
+            the head commit, from a reviewer with write access, as the sign-off
+            (reads GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_EVENT_PATH)
+approve:    --base ID (default: last snapshot) --head ID (default: working tree) --note --by
 redact:     --redact pii|hash|off (ingest / baseline)
 mcp stdio:  --mcp-stdio (init / snapshot / diff / ci) runs stdio MCP servers
             to read their live tool list. Off by default: it executes the
@@ -177,17 +182,24 @@ func cmdInit(args []string) error {
 	if err := store.WritePolicyStub(p); err != nil {
 		return err
 	}
+	// Generated state stays out of the repository unless the team says
+	// otherwise: see store.WriteGitignoreStub for what is kept.
+	if err := store.WriteGitignoreStub(p); err != nil {
+		return err
+	}
 	_ = evalcase.WriteBindingsStub(evalcase.DefaultBindingsPath(root))
 	wrote := p.Manifest
 	if rel, err := filepath.Rel(root, p.Manifest); err == nil {
 		wrote = rel
 	}
+	commit := filepath.Join(store.DirName, store.PolicyFile)
 	out.Print(out.Frame("airlock init", []string{
 		fmt.Sprintf("agents  %-4d  models  %-4d  prompts  %d", len(m.Agents), len(m.Models), len(m.Prompts)),
 		fmt.Sprintf("tools   %-4d  skills  %-4d  mcp      %d", len(m.Tools), len(m.Skills), len(m.MCPServers)),
 		fmt.Sprintf("evals   %d", len(m.Evals)),
 		"",
 		"wrote  " + wrote,
+		"commit " + commit + "  (.airlock/.gitignore keeps the rest local)",
 	}))
 	return nil
 }
@@ -457,6 +469,44 @@ func evalGateErr(report *policy.Report, failEval, failInconclusive bool) error {
 	return nil
 }
 
+// resolveApproval says whether the human gate is satisfied and by whom.
+//
+// signoff names who approved and how, for the report; unblock is the ledger
+// command to show when nothing has, and stays empty in GitHub mode because
+// the answer there is a review, not a command. approved is what the
+// fail-closed gate reads. err is set when the GitHub check itself failed, in
+// which case approved is false and the caller fails closed.
+func resolveApproval(root string, dr *diff.Result, baseID, headID string, github bool, pr int) (signoff, unblock string, approved bool, err error) {
+	if !dr.NeedsApproval {
+		return "", "", true, nil
+	}
+	ledger := store.ForRoot(root).Approvals
+	if approval.Has(ledger, baseID, headID) {
+		who := "the ledger"
+		if rec, lerr := approval.Load(ledger, baseID, headID); lerr == nil && rec.DecidedBy != "" {
+			who = rec.DecidedBy + " (ledger)"
+		}
+		return who, "", true, nil
+	}
+	if !github {
+		return "", fmt.Sprintf("airlock approve --base %s --head %s", baseID, headID), false, nil
+	}
+	opt, err := approval.GitHubEnv(os.Getenv, pr)
+	if err != nil {
+		return "", "", false, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	approvers, err := approval.GitHubReviewApprovals(ctx, opt)
+	if err != nil {
+		return "", "", false, err
+	}
+	if len(approvers) == 0 {
+		return "", "", false, nil
+	}
+	return approval.FormatApprovers(approvers), "", true, nil
+}
+
 func cmdCI(args []string) error {
 	root, args, err := rootFromArgs(args)
 	if err != nil {
@@ -470,12 +520,22 @@ func cmdCI(args []string) error {
 	args, _ = flagBool(args, "--comment") // kept: comment file is always written
 	args, skipEval := flagBool(args, "--skip-eval")
 	args, adversarial := flagBool(args, "--adversarial")
+	args, ghApprovals := flagBool(args, "--github-approvals")
+	args, prFlag := flagVal(args, "--pr")
 	args, baseID := flagVal(args, "--base")
 	args, headID := flagVal(args, "--head")
 	if headID == "" {
 		headID = "working"
 	}
 	_, opt := mcpStdioOpt(args)
+	prNumber := 0
+	if prFlag != "" {
+		n, err := strconv.Atoi(prFlag)
+		if err != nil || n <= 0 {
+			return fmt.Errorf("--pr wants a pull request number, got %q", prFlag)
+		}
+		prNumber = n
+	}
 
 	// Policy can turn gates into blockers so a repo keeps them on without every
 	// workflow repeating the flags. A flag still forces a gate on; policy never
@@ -563,14 +623,21 @@ func cmdCI(args []string) error {
 	if dr.NeedsApproval && overall != policy.Fail {
 		overall = policy.NeedsApproval
 	}
-	unblock := ""
-	if dr.NeedsApproval && !approval.Has(store.ForRoot(root).Approvals, base.ID, head.ID) {
-		unblock = fmt.Sprintf("airlock approve --base %s --head %s", base.ID, head.ID)
+	// Who signed off, if anyone. The ledger is the local answer; on GitHub the
+	// answer is a pull request review on the head commit, which nobody has to
+	// commit and the pull request under review cannot forge.
+	signoff, unblock, approved, approvalErr := resolveApproval(root, dr, base.ID, head.ID, ghApprovals, prNumber)
+	if approvalErr != nil {
+		out.Warn(approvalErr.Error())
 	}
-	// The approve command goes into the comment beside the reasons, not after
-	// the eval tables: a reviewer should not have to scroll past evidence to
-	// find the one command that unblocks the merge.
-	body := diff.FormatCommentWith(dr, string(overall), diff.CommentOptions{ApproveCmd: unblock}) + evalMD
+	// The unblock step goes into the comment beside the reasons, not after the
+	// eval tables: a reviewer should not have to scroll past evidence to find
+	// the one thing that unblocks the merge.
+	body := diff.FormatCommentWith(dr, string(overall), diff.CommentOptions{
+		ApproveCmd:    unblock,
+		ReviewUnblock: ghApprovals,
+		ApprovedBy:    signoff,
+	}) + evalMD
 	body = diff.ClampComment(body, diff.MaxCommentBytes)
 
 	p := store.ForRoot(root)
@@ -593,7 +660,12 @@ func cmdCI(args []string) error {
 		}
 	}
 	extra := []string{"wrote  " + wrote}
-	if unblock != "" {
+	switch {
+	case signoff != "":
+		extra = append([]string{"approved  " + signoff}, extra...)
+	case dr.NeedsApproval && ghApprovals:
+		extra = append([]string{"approve this pull request as a reviewer with write access"}, extra...)
+	case unblock != "":
 		extra = append([]string{unblock}, extra...)
 	}
 	out.Verdict(string(overall), extra...)
@@ -606,12 +678,22 @@ func cmdCI(args []string) error {
 	if err := evalGateErr(evalReport, failEval, failInconclusive); err != nil {
 		return err
 	}
-	if failApproval {
-		if err := approval.Require(store.ForRoot(root).Approvals, base.ID, head.ID, dr.NeedsApproval); err != nil {
-			return err
+	if failApproval && dr.NeedsApproval && !approved {
+		if approvalErr != nil {
+			return fmt.Errorf("NEEDS_APPROVAL and the sign-off could not be checked: %w", approvalErr)
 		}
+		if ghApprovals {
+			return fmt.Errorf("NEEDS_APPROVAL without an approving review on the head commit from a reviewer with write access")
+		}
+		return approval.Require(store.ForRoot(root).Approvals, base.ID, head.ID, true)
 	}
-	if failSentinel || sentinelStoreExists(root) {
+	// The sentinel gate compares against fingerprints a previous probe wrote.
+	// A repo that never probed has nothing to compare, so the gate is
+	// unconfigured rather than undecided: say so, and do not fail a merge over
+	// it. init writes fail_on.sentinel: true, and blocking here would fail every
+	// new repo's first CI run.
+	switch {
+	case sentinelStoreExists(root):
 		if rep, err := runSentinelCheck(root); err != nil {
 			if failSentinel {
 				return err
@@ -622,6 +704,9 @@ func cmdCI(args []string) error {
 				return fmt.Errorf("model sentinel drift detected")
 			}
 		}
+	case failSentinel:
+		out.Warn("fail_on.sentinel is on but no model fingerprints exist yet; run `airlock sentinel probe` " +
+			"and commit .airlock/sentinel/ to gate provider drift. Skipping the sentinel gate.")
 	}
 	return nil
 }
@@ -1095,14 +1180,14 @@ func cmdApprove(args []string) error {
 	rest, headID := flagVal(rest, "--head")
 	rest, note := flagVal(rest, "--note")
 	_, by := flagVal(rest, "--by")
-	if baseID == "" {
-		return fmt.Errorf("usage: airlock approve --base ID --head ID [--note TEXT] [--by WHO] [--path DIR]")
-	}
+	// No --base means the last snapshot and no --head means the working tree,
+	// the same defaults diff and ci use, so the ids from a CI comment are not
+	// required to record a local decision.
 	if headID == "" {
 		headID = "working"
 	}
 	if by == "" {
-		by = os.Getenv("USER")
+		by = cmp.Or(os.Getenv("USER"), os.Getenv("USERNAME"))
 	}
 	p := store.ForRoot(root)
 	if err := p.Ensure(); err != nil {

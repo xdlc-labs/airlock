@@ -5,6 +5,22 @@ branding:
   icon: shield
   color: blue
 
+inputs:
+  github-approvals:
+    description: >-
+      Take an approving pull request review on the head commit, from a reviewer
+      with write access, as the human sign-off for a permission expansion. Set
+      to "false" to require a committed .airlock/approvals ledger entry instead.
+    required: false
+    default: "true"
+  mcp-stdio:
+    description: >-
+      Start stdio MCP servers named in the repository's MCP config to read their
+      live tool list. Runs code from the branch under test: leave off for
+      workflows that build pull requests from forks.
+    required: false
+    default: "false"
+
 runs:
   using: composite
   steps:
@@ -88,19 +104,27 @@ runs:
     - shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        GITHUB_TOKEN: ${{ github.token }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
+        GITHUB_APPROVALS: ${{ inputs.github-approvals }}
+        MCP_STDIO: ${{ inputs.mcp-stdio }}
       run: |
         set -euo pipefail
         echo "  2/5  fetch refs"
         echo "::group::2/5 Fetch refs"
         git fetch -q origin "${GITHUB_BASE_REF:-HEAD}" 2>/dev/null || true
-        if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-          BASE=$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)
-          HEAD=${GITHUB_SHA}
-        else
-          HEAD=$(git rev-parse HEAD)
-          BASE=$(git rev-parse HEAD~1 2>/dev/null || echo "$HEAD")
-        fi
+        case "${GITHUB_EVENT_NAME:-}" in
+          pull_request|pull_request_target|pull_request_review)
+            # pull_request_review runs when a reviewer approves, so the gate
+            # re-checks with the review in hand. Same merge ref, same base.
+            BASE=$(git merge-base "origin/${GITHUB_BASE_REF}" HEAD)
+            HEAD=${GITHUB_SHA}
+            ;;
+          *)
+            HEAD=$(git rev-parse HEAD)
+            BASE=$(git rev-parse HEAD~1 2>/dev/null || echo "$HEAD")
+            ;;
+        esac
         echo "  base  ${BASE:0:12}"
         echo "  head  ${HEAD:0:12}"
         echo "::endgroup::"
@@ -112,10 +136,19 @@ runs:
         }
         trap cleanup EXIT
 
+        scan_flags=()
+        if [ "${MCP_STDIO:-false}" = "true" ]; then
+          scan_flags+=(--mcp-stdio)
+        fi
+        gate_flags=(--fail-on-approval)
+        if [ "${GITHUB_APPROVALS:-true}" = "true" ] && [ -n "${PR_NUMBER:-}" ]; then
+          gate_flags+=(--github-approvals --pr "$PR_NUMBER")
+        fi
+
         echo "  3/5  snapshot merge-base"
         echo "::group::3/5 Snapshot merge-base"
         git worktree add -q --detach "$w/base" "$BASE"
-        (cd "$w/base" && /tmp/airlock init && /tmp/airlock snapshot)
+        (cd "$w/base" && /tmp/airlock init "${scan_flags[@]}" && /tmp/airlock snapshot "${scan_flags[@]}")
         id=$(basename "$(ls -t "$w/base/.airlock/snapshots/"*.json | head -1)" .json)
         echo "  ok   $id"
         echo "::endgroup::"
@@ -125,14 +158,14 @@ runs:
         git worktree add -q --detach "$w/head" "$HEAD"
         mkdir -p "$w/head/.airlock/snapshots"
         cp -a "$w/base/.airlock/snapshots/." "$w/head/.airlock/snapshots/"
-        (cd "$w/head" && /tmp/airlock init && /tmp/airlock snapshot)
+        (cd "$w/head" && /tmp/airlock init "${scan_flags[@]}" && /tmp/airlock snapshot "${scan_flags[@]}")
         echo "  ok   head"
         echo "::endgroup::"
 
         echo "  5/5  gate"
         echo "::group::5/5 Gate"
         set +e
-        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working --fail-on-approval)
+        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working "${scan_flags[@]}" "${gate_flags[@]}")
         status=$?
         set -e
         echo "::endgroup::"
