@@ -28,35 +28,46 @@ install_from_release() {
     aarch64 | arm64) arch=arm64 ;;
     *) echo "error: unsupported arch: $arch" >&2; return 1 ;;
   esac
+  local ext=tar.gz bin="$BIN_NAME"
   case "$os" in
     linux | darwin) ;;
+    mingw* | msys* | cygwin*)
+      # Git Bash / MSYS2 on Windows: releases carry a zip with airlock.exe.
+      os=windows; ext=zip; bin="${BIN_NAME}.exe"
+      need_cmd unzip || return 1
+      ;;
     *) echo "error: unsupported OS: $os" >&2; return 1 ;;
   esac
 
   tag="${AIRLOCK_VERSION:-}"
   if [[ -z "$tag" ]]; then
-    # /releases/latest ignores prereleases — pin AIRLOCK_VERSION for betas
+    # Newest stable release. Pre-releases are skipped here: pin AIRLOCK_VERSION
+    # to install one of those.
     tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1) || true
   fi
   if [[ -z "$tag" ]]; then
     return 1
   fi
-  # allow AIRLOCK_VERSION=0.1.0-beta.1 or v0.1.0-beta.1
+  # allow AIRLOCK_VERSION=1.0.0 or v1.0.0
   case "$tag" in
     v*) ;;
     *) tag="v${tag}" ;;
   esac
-  url="https://github.com/${REPO}/releases/download/${tag}/${BIN_NAME}_${tag#v}_${os}_${arch}.tar.gz"
+  url="https://github.com/${REPO}/releases/download/${tag}/${BIN_NAME}_${tag#v}_${os}_${arch}.${ext}"
   tmp=$(mktemp -d)
-  if ! curl -fsSL "$url" -o "$tmp/airlock.tgz"; then
+  if ! curl -fsSL "$url" -o "$tmp/airlock.$ext"; then
     echo "error: no asset at $url" >&2
     rm -rf "$tmp"
     return 1
   fi
-  tar -xzf "$tmp/airlock.tgz" -C "$tmp"
-  install -m 755 "$tmp/$BIN_NAME" "$dest/$BIN_NAME"
+  if [[ "$ext" == zip ]]; then
+    unzip -q "$tmp/airlock.$ext" -d "$tmp"
+  else
+    tar -xzf "$tmp/airlock.$ext" -C "$tmp"
+  fi
+  install -m 755 "$tmp/$bin" "$dest/$bin"
   rm -rf "$tmp"
-  echo "installed $dest/$BIN_NAME ($tag)"
+  echo "installed $dest/$bin ($tag)"
 }
 
 install_from_source_tree() {

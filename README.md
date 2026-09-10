@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/xdlc-labs/airlock/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/xdlc-labs/airlock/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
-  <a href="https://github.com/xdlc-labs/airlock/releases"><img src="https://img.shields.io/github/v/release/xdlc-labs/airlock?include_prereleases&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/xdlc-labs/airlock/releases"><img src="https://img.shields.io/github/v/release/xdlc-labs/airlock?style=flat-square" alt="Release"></a>
   <a href="go.mod"><img src="https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
 </p>
@@ -43,16 +43,18 @@ that needs a person. Walk through it below on the toy agent.
 
 ## Install
 
-Linux and macOS, `amd64` and `arm64`. Windows is not supported yet.
+Linux, macOS, and Windows, `amd64` and `arm64`.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | AIRLOCK_VERSION=v0.1.0-beta.15 bash
-# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v0.1.0-beta.15
+curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | bash
+# a specific version: AIRLOCK_VERSION=v1.0.0 bash
+# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v1.0.0
 ```
 
-This is a public beta, so every release is a pre-release and GitHub's "latest"
-link skips them. Pin the tag above, or pick one from
-[Releases](https://github.com/xdlc-labs/airlock/releases).
+The script installs the newest stable release. On Windows run it from Git Bash,
+or download the `windows` zip from
+[Releases](https://github.com/xdlc-labs/airlock/releases) and put `airlock.exe`
+on your `PATH`.
 
 ## Break a prompt, watch Airlock catch it
 
@@ -65,13 +67,14 @@ airlock init && airlock snapshot
 ```
 
 ```console
-╭─ airlock init ───────────────────────────────╮
-│ agents  1     models  1     prompts  2       │
-│ tools   0     skills  1     mcp      2       │
-│ evals   2                                    │
-│                                              │
-│ wrote  .airlock/manifest.json                │
-╰──────────────────────────────────────────────╯
+╭─ airlock init ─────────────────────────────────────────────────────────╮
+│ agents  1     models  1     prompts  2                                 │
+│ tools   0     skills  1     mcp      2                                 │
+│ evals   2                                                              │
+│                                                                        │
+│ wrote  .airlock/manifest.json                                          │
+│ commit .airlock/policy.yml  (.airlock/.gitignore keeps the rest local) │
+╰────────────────────────────────────────────────────────────────────────╯
 ╭─ snapshot ───────────────────────────────────╮
 │ dca3ae3e3db0bd58                             │
 │ artifacts  10    manifest  1ed9ab1f53b8      │
@@ -161,8 +164,10 @@ exit 1
 ```
 
 Adding a skill, widening a write tool, or a live MCP server growing a new tool in
-its `tools/list` all take the same path. `airlock approve` records the decision in
-a ledger so the next run knows a human said yes.
+its `tools/list` all take the same path. Locally, `airlock approve` records the
+decision in a ledger so the next run knows a human said yes. On GitHub the
+sign-off is an ordinary pull request review, and nothing has to be committed:
+see [Use it on your repo](#use-it-on-your-repo).
 
 ### Reading tool lists from stdio MCP servers
 
@@ -178,9 +183,12 @@ airlock snapshot --mcp-stdio
 from the repository root. Do not enable it on a workflow that builds pull
 requests from forks: the command comes from the branch under test. Probing on a
 machine you trust and committing the resulting `.airlock/manifest.json` gives CI
-the tool list without CI ever starting a server. Without the flag a stdio server
-is tracked by its config hash, exactly as before, so a changed `command` or
-`args` is still caught.
+the tool list without CI ever starting a server: a scan that does not probe
+reuses the committed list for as long as that server's config entry is
+unchanged. `airlock init` ignores the manifest by default, so uncomment the
+`!manifest.json` line in `.airlock/.gitignore` to commit it. Without the flag
+and without a committed list, a stdio server is tracked by its config hash, so
+a changed `command` or `args` is still caught.
 
 The full walkthrough, including `--mode live`, judges, drift, and the production
 loop, is in the [developer guide](https://xdlc.dev/airlock/docs/guide).
@@ -190,7 +198,10 @@ loop, is in the [developer guide](https://xdlc.dev/airlock/docs/guide).
 ```yaml
 # .github/workflows/airlock.yml
 name: Airlock
-on: pull_request
+on:
+  pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
 permissions:
   contents: read
   pull-requests: write
@@ -201,15 +212,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: xdlc-labs/airlock@v0
+      - uses: xdlc-labs/airlock@v1
 ```
 
-That is the whole install. `@v0` tracks the newest release, or pin an exact tag
+That is the whole install. `@v1` tracks the newest release, or pin an exact tag
 if you would rather move deliberately. The Action diffs merge-base against HEAD,
 writes `.airlock/ci-comment.md`, and comments on the pull request. It fails closed
 on permission expansion by default.
 
-`airlock init` writes a `.airlock/policy.yml` stub you can commit and tune. It
+### Unblocking a `NEEDS_APPROVAL` on GitHub
+
+Approve the pull request. That is the whole procedure. The Action reads the
+reviews on the pull request and takes an approving review from someone with
+write access as the human sign-off, as long as the review is on the current
+head commit. A new push asks again, a `Request changes` withdraws, and the
+author cannot approve their own change. The `pull_request_review` trigger above
+is what re-runs the gate when the review lands.
+
+This is why nothing under `.airlock/` has to be committed to unblock a merge,
+and why the pull request that widens a tool cannot also carry the file that
+turns its own check green. Layer branch protection on top as usual: a required
+review, and `CODEOWNERS` on `.airlock/policy.yml`, `**/SKILL.md`, and your MCP
+config, so the people who own the agent surface are the ones who approve it.
+
+Prefer a committed ledger anyway, for a CI system without reviews or an audit
+trail that lives in the repository? Set `github-approvals: "false"` on the
+Action, delete the `approvals/` line from `.airlock/.gitignore`, and commit
+what `airlock approve` writes.
+
+`airlock init` writes a `.airlock/.gitignore` that keeps generated state
+(manifest, snapshots, the latest result, the comment file) out of your
+repository, and a `.airlock/policy.yml` stub you commit and tune. The policy
 starts fail-closed:
 
 ```yaml
@@ -246,8 +279,8 @@ application security scanner.
 That last row is the narrow claim worth being precise about: a dependency bump on
 its own is Dependabot's job and Airlock stays quiet. It speaks up when an
 AI-artifact change and a new dependency arrive in the same pull request, which is
-what an agent proposing its own tools looks like. Details in the
-[roadmap](https://xdlc.dev/airlock/docs/roadmap#agent-driven-supply-chain).
+what an agent proposing its own tools looks like. Airlock does not check whether
+a package is malware. Keep the scanners.
 
 ## If you already use LangSmith, Braintrust, Langfuse, or Phoenix
 
@@ -271,8 +304,7 @@ writes them, so `test` and `ci` pick them up unchanged. Self-hosted LangSmith:
 point `--api-url` (or `LANGSMITH_ENDPOINT`) at your host, including any
 `/api/v1` prefix it serves. The pull reads datasets only — traces, online eval
 scores, and annotation queues stay where they are, and there is no hosted
-dashboard here at all. See the
-[roadmap](https://xdlc.dev/airlock/docs/roadmap#langsmith--braintrust--langfuse--phoenix).
+dashboard here at all.
 
 ## What is in the box
 
@@ -295,17 +327,20 @@ Copilot instructions, `.claude/agents/*.md`), MCP configs, prompt
 files, Promptfoo suites, `go.sum`, `package-lock.json`, `pnpm-lock.yaml`,
 `yarn.lock`, `Cargo.lock`, `poetry.lock`, `Pipfile.lock`, `uv.lock`, and
 heuristics for the OpenAI SDK, the Anthropic SDK, LangGraph, LlamaIndex, CrewAI,
-AutoGen, and the Vercel AI SDK. It is not every framework yet. The
+AutoGen, and the Vercel AI SDK. It is not every framework. The
 [guide](https://xdlc.dev/airlock/docs/guide#what-init-discovers-today) lists exactly what is and is not
-detected today, and the [roadmap](https://xdlc.dev/airlock/docs/roadmap) covers the rest.
+detected today. Discovery is heuristic where no lockfile exists: a Go SDK that
+names its model through an exported constant stays invisible, and an
+undiscovered artifact is one the gate cannot diff. Declare it in `apm.lock.yaml`
+and it is gated like the rest.
 
 ## Status
 
-Public beta. Expect discovery gaps and CLI churn before 1.0. No telemetry, no
-hosted control plane, nothing uploads by default.
+Stable. The CLI, the `.airlock/` layout, and the Action inputs follow SemVer
+from 1.0: a breaking change means a new major. No telemetry, no hosted control
+plane, nothing uploads by default.
 
 [Guide](https://xdlc.dev/airlock/docs/guide) ·
-[Roadmap](https://xdlc.dev/airlock/docs/roadmap) ·
 [Changelog](CHANGELOG.md) ·
 [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) ·

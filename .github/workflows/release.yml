@@ -33,6 +33,10 @@ jobs:
             goarch: amd64
           - goos: darwin
             goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -71,10 +75,15 @@ jobs:
           set -euo pipefail
           out="airlock_${VER}_${GOOS}_${GOARCH}"
           mkdir -p dist
-          go build -trimpath -ldflags="-s -w -X main.version=${VER}" -o "dist/airlock" ./cmd/airlock
-          tar -C dist -czf "dist/${out}.tar.gz" airlock
-          rm -f dist/airlock
-          (cd dist && sha256sum "${out}.tar.gz" > "${out}.tar.gz.sha256")
+          if [ "$GOOS" = windows ]; then
+            go build -trimpath -ldflags="-s -w -X main.version=${VER}" -o "dist/airlock.exe" ./cmd/airlock
+            (cd dist && zip -q "${out}.zip" airlock.exe && rm -f airlock.exe && sha256sum "${out}.zip" > "${out}.zip.sha256")
+          else
+            go build -trimpath -ldflags="-s -w -X main.version=${VER}" -o "dist/airlock" ./cmd/airlock
+            tar -C dist -czf "dist/${out}.tar.gz" airlock
+            rm -f dist/airlock
+            (cd dist && sha256sum "${out}.tar.gz" > "${out}.tar.gz.sha256")
+          fi
 
       - uses: actions/upload-artifact@v4
         with:

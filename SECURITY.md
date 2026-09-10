@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-**Public beta** — use tagged releases only ([CHANGELOG](CHANGELOG.md) / [Releases](https://github.com/xdlc-labs/airlock/releases)).
+The newest 1.x release is supported. Use tagged releases ([CHANGELOG](CHANGELOG.md) / [Releases](https://github.com/xdlc-labs/airlock/releases)).
 
 Security fixes land on `main` and ship in the next tagged release. Untagged `main` / `go install @latest` may differ from a release binary.
 
@@ -28,6 +28,7 @@ You should get an acknowledgement within a few days. Please give a reasonable wi
 - **Local-first:** the OSS binary does not upload traces or eval data.
 - **Redaction:** `ingest` / `baseline` run local regex redaction before writing under `.airlock/`.
 - **Trust boundary:** treat `.airlock/` contents and eval fixtures as sensitive if they came from production.
-- **Approvals:** `NEEDS_APPROVAL` + the local approval ledger are advisory unless CI uses `--fail-on-approval`. The GitHub Action passes that flag. Skill and MCP expansions both raise approval.
+- **Approvals:** `NEEDS_APPROVAL` blocks a merge when `fail_on.approval` is set in `.airlock/policy.yml` or CI passes `--fail-on-approval`; the GitHub Action passes that flag. Skill and MCP expansions both raise approval. On GitHub the sign-off is an approving pull request review on the head commit from a reviewer with write access, read over the API with the workflow token; a review on an older commit, from the author, or from a read-only account does not count. The local ledger (`airlock approve`) is the alternative and lives in the tree, so protect `.airlock/approvals/` with `CODEOWNERS` if you commit it.
+- **Stdio MCP probing:** `--mcp-stdio` (and the Action's `mcp-stdio` input) runs the commands in the repository's MCP config. Leave it off for workflows that build pull requests from forks.
 
 Known non-goals for the OSS CLI: multi-tenant auth, remote policy sync, guaranteed GDPR tooling.

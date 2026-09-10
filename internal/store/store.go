@@ -120,6 +120,45 @@ budgets:
 	return os.WriteFile(p.Policy, []byte(stub), 0o644)
 }
 
+// GitignoreFile is written into .airlock/ by init so the state Airlock rebuilds
+// on every run does not end up in the repository. Committing snapshots and
+// results is what made the approval ledger look like just another generated
+// file, and a pull request full of .airlock/ churn hides the one file that
+// matters.
+const GitignoreFile = ".gitignore"
+
+// WriteGitignoreStub writes .airlock/.gitignore unless one exists.
+func WriteGitignoreStub(p Paths) error {
+	if err := p.Ensure(); err != nil {
+		return err
+	}
+	path := filepath.Join(p.Airlock, GitignoreFile)
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	stub := `# Written by airlock init. Airlock rebuilds these on every run, so they do
+# not belong in the repository. Keep policy.yml, eval-bindings.yml, evals/,
+# judges/, cassettes/, and sentinel/ committed: those are yours.
+manifest.json
+snapshots/
+results/latest.json
+ci-comment.md
+ingest/
+
+# The approval ledger. On GitHub the human sign-off is a pull request review
+# (see the Action's github-approvals input), so the ledger stays local. A CI
+# system without reviews unblocks through committed ledger entries instead:
+# delete the next line to ship them.
+approvals/
+
+# A manifest probed with --mcp-stdio carries the tool list of stdio MCP
+# servers, and a committed one gives CI that list without CI starting a
+# server. Uncomment to commit it.
+# !manifest.json
+`
+	return os.WriteFile(path, []byte(stub), 0o644)
+}
+
 func WriteSnapshot(p Paths, snap *manifest.Snapshot) error {
 	if err := p.Ensure(); err != nil {
 		return err

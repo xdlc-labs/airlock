@@ -115,3 +115,29 @@ func TestInitWritesFailClosedPolicy(t *testing.T) {
 		}
 	}
 }
+
+// TestCmdCISentinelGateWithoutFingerprintsDoesNotBlock: the stub policy turns
+// fail_on.sentinel on, and a repo that has never probed must still get through
+// its first CI run. The gate is unconfigured, not failing.
+func TestCmdCISentinelGateWithoutFingerprintsDoesNotBlock(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "prompts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "prompts", "system.md"), []byte("v1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdInit([]string{"--path", root}); err != nil {
+		t.Fatal(err)
+	}
+	base, err := snapshot.Create(root, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdCI([]string{"--path", root, "--base", base.ID, "--skip-eval"}); err != nil {
+		t.Fatalf("a fresh repo with the stub policy must pass its first ci run, got %v", err)
+	}
+	if err := cmdCI([]string{"--path", root, "--base", base.ID, "--skip-eval", "--fail-on-sentinel"}); err != nil {
+		t.Fatalf("--fail-on-sentinel without fingerprints is unconfigured, not a failure, got %v", err)
+	}
+}

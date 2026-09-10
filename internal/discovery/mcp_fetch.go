@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -82,6 +83,11 @@ func enrichMCPSchemas(ctx context.Context, client *http.Client, m *manifest.Mani
 			continue
 		}
 		h := manifest.HashBytes(schema)
+		if tag == "mcp-stdio" {
+			// The next scan will usually not probe. Keep the config hash so it
+			// can tell whether this tool list still describes the config.
+			m.MCPServers[i].ConfigHash = m.MCPServers[i].SchemaHash
+		}
 		if h != m.MCPServers[i].SchemaHash {
 			m.MCPServers[i].SchemaHash = h
 			if !strings.Contains(m.MCPServers[i].Source, tag) {
@@ -209,4 +215,39 @@ func collectMCPConfigs(raw map[string]json.RawMessage) map[string]json.RawMessag
 		}
 	}
 	return out
+}
+
+// carryStdioToolLists reuses the tool list a previous probed scan recorded in
+// the repository's manifest for stdio servers this scan did not probe.
+//
+// Probing runs the server, so CI leaves it off and would otherwise fall back
+// to the config hash alone, losing the tool list someone deliberately probed
+// and committed. The carried list is trusted only while the server's config
+// entry hashes the same as when it was probed: a changed command or args is a
+// different server, and goes back to config-hash tracking until probed again.
+// A scan that does probe never reads the old list.
+func carryStdioToolLists(m, prior *manifest.Manifest, opt Options) {
+	if opt.ProbeStdioMCP || prior == nil {
+		return
+	}
+	byID := make(map[string]manifest.MCPServer, len(prior.MCPServers))
+	for _, s := range prior.MCPServers {
+		byID[s.ID] = s
+	}
+	for i := range m.MCPServers {
+		cur := &m.MCPServers[i]
+		if len(cur.ToolNames) > 0 || cur.ConfigHash != "" {
+			continue // read live this scan
+		}
+		old, ok := byID[cur.ID]
+		if !ok || old.ConfigHash == "" || old.ConfigHash != cur.SchemaHash || !strings.Contains(old.Source, "mcp-stdio") {
+			continue
+		}
+		cur.ConfigHash = old.ConfigHash
+		cur.SchemaHash = old.SchemaHash
+		cur.ToolNames = slices.Clone(old.ToolNames)
+		if !strings.Contains(cur.Source, "mcp-stdio") {
+			cur.Source += "+mcp-stdio"
+		}
+	}
 }

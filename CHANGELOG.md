@@ -13,6 +13,35 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 
 ### Fixed
 
+## [1.0.0] – 2026-09-10
+
+First stable release. The CLI, the `.airlock/` layout, and the Action inputs
+follow SemVer from here: a breaking change means a new major. Pin
+`uses: xdlc-labs/airlock@v1` or `@v1.0.0`.
+
+### Highlights
+- On GitHub, a `NEEDS_APPROVAL` is unblocked by approving the pull request. No ledger file to commit.
+- `airlock init` writes `.airlock/.gitignore`, so generated state stays out of the repository.
+- Windows binaries, tested in CI.
+- A manifest probed with `--mcp-stdio` and committed now really does give CI the stdio tool list.
+
+### Added
+- **Pull request reviews are the human sign-off.** `airlock ci --github-approvals` reads the reviews on the pull request and takes an approving review on the head commit, from a reviewer with write access, as the approval a permission expansion needs. The Action passes it by default (`github-approvals: "true"`) and the PR comment asks for a review instead of for a command. A review on an earlier commit does not carry to a new push, `Request changes` withdraws, the author cannot approve their own change, and a read-only or triage account does not count. Any failure to reach the API blocks rather than passes. The pull request that widens a tool can no longer carry the file that turns its own check green. Closes [#7](https://github.com/xdlc-labs/airlock/issues/7).
+- `airlock init` writes `.airlock/.gitignore` covering `manifest.json`, `snapshots/`, `results/latest.json`, `ci-comment.md`, `ingest/`, and `approvals/`. `policy.yml`, `eval-bindings.yml`, `evals/`, `judges/`, `cassettes/`, `sentinel/`, and per-snapshot results stay committed. An existing `.gitignore` is left alone, and the file says which lines to remove to commit the ledger or a probed manifest.
+- Action inputs: `github-approvals` (default `"true"`) and `mcp-stdio` (default `"false"`). The Action handles `pull_request_review` events, so adding that trigger to a workflow re-runs the gate when a review lands.
+- Windows: `windows_amd64` and `windows_arm64` zips on every release, `install.sh` handles Git Bash and MSYS2, and CI runs the test suite on `windows-latest`.
+- A stdio MCP server that was probed with `--mcp-stdio` keeps its config hash in the manifest (`config_hash`). A later scan that does not probe reuses the committed tool list while that config entry is unchanged, so a probed and committed manifest gives CI the tool list without CI starting the server, as the README promised. A changed `command` or `args` drops the carried list and falls back to config-hash tracking until probed again. A probing scan never reads the old list. Locally this also stops `airlock diff` from reporting a changed server after `airlock snapshot --mcp-stdio`.
+- `airlock approve` defaults `--base` to the last snapshot and `--head` to the working tree, the same defaults `diff` and `ci` use, so the ids from a CI comment are no longer required to record a local decision. `--by` falls back to `USERNAME` on Windows.
+- The PR comment and the verdict box say who signed off (`Signed off by @reviewer (pull request review on abc1234)`, or `dev (ledger)`).
+
+### Changed
+- The README tells app repos to pin `uses: xdlc-labs/airlock@v1` and to add `pull_request_review` to the workflow triggers. The moving `v0` tag stays where it is.
+- `install.sh` installs the newest stable release when `AIRLOCK_VERSION` is not set; pre-releases still need the pin.
+- Docs no longer link to the external roadmap. What was left on it for the OSS gate has shipped; the rest is out of scope for this repository.
+
+### Fixed
+- `airlock ci` failed every fresh repo's first run. The `fail_on.sentinel: true` that `init` writes since beta.15 made `ci` run the sentinel check, which errors when no fingerprints exist, and that error was returned as the gate result. A repo that never ran `airlock sentinel probe` has nothing to compare, so the gate now says it is unconfigured and skips, with a warning naming the command that turns it on. A repo with fingerprints is gated exactly as before.
+
 ## [0.1.0-beta.15] – 2026-09-09
 
 Fail-closed policy, more discovery, and a PR comment that leads with what to do.
@@ -271,7 +300,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.15...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.15...v1.0.0
 [0.1.0-beta.15]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.14...v0.1.0-beta.15
 [0.1.0-beta.14]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...v0.1.0-beta.14
 [0.1.0-beta.13]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.12...v0.1.0-beta.13
