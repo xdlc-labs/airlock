@@ -165,7 +165,7 @@ runs:
         echo "  5/5  gate"
         echo "::group::5/5 Gate"
         set +e
-        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working "${scan_flags[@]}" "${gate_flags[@]}")
+        (cd "$w/head" && /tmp/airlock ci --base "$id" --head working --base-dir "$w/base" "${scan_flags[@]}" "${gate_flags[@]}")
         status=$?
         set -e
         echo "::endgroup::"

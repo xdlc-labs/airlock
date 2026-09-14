@@ -28,6 +28,18 @@ func TestEvalGateErr(t *testing.T) {
 		{"FAIL, --fail-on-inconclusive only: still gates (worse than inconclusive)", &policy.Report{Overall: policy.Fail}, false, true, true},
 		{"INCONCLUSIVE, no flags: passes silently", &policy.Report{Overall: policy.Inconclusive}, false, false, false},
 		{"NEEDS_APPROVAL: not this gate's job", &policy.Report{Overall: policy.NeedsApproval}, true, true, false},
+		{"SKIPPED metric, --fail-on-inconclusive: gates", &policy.Report{
+			Overall: policy.Pass,
+			Metrics: []policy.MetricEvidence{{Name: "task_success", Verdict: policy.Skipped}},
+		}, false, true, true},
+		{"SKIPPED metric, --fail-on-eval only: still passes", &policy.Report{
+			Overall: policy.Pass,
+			Metrics: []policy.MetricEvidence{{Name: "task_success", Verdict: policy.Skipped}},
+		}, true, false, false},
+		{"SKIPPED metric, no flags: still passes", &policy.Report{
+			Overall: policy.Pass,
+			Metrics: []policy.MetricEvidence{{Name: "task_success", Verdict: policy.Skipped}},
+		}, false, false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

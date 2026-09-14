@@ -120,6 +120,7 @@ Commands:
 
 test flags: --path --suite --affected --mode --json --baseline-results ID --adversarial
 ci flags:   --fail-on-change --fail-on-eval --fail-on-inconclusive --fail-on-approval --fail-on-sentinel --comment --skip-eval --adversarial
+            --base-dir DIR evals that tree when no result is stored for --base
             (or set them once in .airlock/policy.yml under fail_on:)
             --github-approvals [--pr N] takes an approving pull request review on
             the head commit, from a reviewer with write access, as the sign-off
@@ -452,6 +453,9 @@ func affectedAgents(root string) ([]string, error) {
 // straddling the min forever, stuck at INCONCLUSIVE with nothing failing CI.
 // --fail-on-inconclusive closes that gap (and, since FAIL is strictly worse
 // than INCONCLUSIVE, also covers FAIL so enabling it alone still fails closed).
+// SKIPPED comparative gates stay out of Overall so local `airlock test` still
+// PASSes without a baseline. In CI they are the same gap as INCONCLUSIVE:
+// fail_on.inconclusive must close it.
 func evalGateErr(report *policy.Report, failEval, failInconclusive bool) error {
 	if report == nil {
 		return nil
@@ -466,7 +470,31 @@ func evalGateErr(report *policy.Report, failEval, failInconclusive bool) error {
 			return fmt.Errorf("eval verdict INCONCLUSIVE (raise max_samples_per_case or widen the gate to resolve)")
 		}
 	}
+	if failInconclusive {
+		for _, m := range report.Metrics {
+			if m.Verdict == policy.Skipped {
+				return fmt.Errorf("eval gate %s SKIPPED (no baseline to compare, treat as inconclusive)", m.Name)
+			}
+		}
+	}
 	return nil
+}
+
+// runEvalSuite runs the already-resolved cases against artifacts in root.
+func runEvalSuite(root, snapID string, suite evalcase.Suite, cases []evalcase.Case, pol policy.Policy, baseline map[string][]bool) (*evaluation.RunResult, *judge.Registry, error) {
+	client, err := buildHTTPClient(root, suite, suite.Mode)
+	if err != nil {
+		return nil, nil, err
+	}
+	cfg := evaluation.Config{Suite: suite, Policy: pol, Client: client, SnapshotID: snapID, Baseline: baseline}
+	reg := loadJudges(root, client)
+	if len(reg.ByID) > 0 {
+		cfg.JudgeScore = judgeHook(reg)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	res, err := evaluation.Run(ctx, cases, cfg)
+	return res, reg, err
 }
 
 // resolveApproval says whether the human gate is satisfied and by whom.
@@ -523,6 +551,7 @@ func cmdCI(args []string) error {
 	args, ghApprovals := flagBool(args, "--github-approvals")
 	args, prFlag := flagVal(args, "--pr")
 	args, baseID := flagVal(args, "--base")
+	args, baseDir := flagVal(args, "--base-dir")
 	args, headID := flagVal(args, "--head")
 	if headID == "" {
 		headID = "working"
@@ -576,19 +605,23 @@ func cmdCI(args []string) error {
 		suite, cases, lerr := resolveCasesForDiff(root, dr, adversarial, secSurface, mcpTouched, skillTouched)
 		if lerr == nil && len(cases) > 0 {
 			pol := gatePolicy
-			client, _ := buildHTTPClient(root, suite, suite.Mode)
-			cfg := evaluation.Config{Suite: suite, Policy: pol, Client: client, SnapshotID: head.ID}
 			if bres, err := evaluation.FindBaseline(store.ForRoot(root).Results, base.ID); err == nil {
-				cfg.Baseline = evaluation.BaselineFromResult(bres)
 				baseRes = bres
+			} else if baseDir != "" {
+				out.Printf("eval baseline from --base-dir (%s)\n", base.ID)
+				bres, _, berr := runEvalSuite(baseDir, base.ID, suite, cases, pol, nil)
+				if berr != nil {
+					out.Warn("base eval failed: " + berr.Error())
+				} else {
+					baseRes = bres
+					_ = evaluation.SaveResult(store.ForRoot(root).Results, base.ID, bres)
+				}
 			}
-			reg := loadJudges(root, client)
-			if len(reg.ByID) > 0 {
-				cfg.JudgeScore = judgeHook(reg)
+			var baseVec map[string][]bool
+			if baseRes != nil {
+				baseVec = evaluation.BaselineFromResult(baseRes)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-			res, rerr := evaluation.Run(ctx, cases, cfg)
-			cancel()
+			res, reg, rerr := runEvalSuite(root, head.ID, suite, cases, pol, baseVec)
 			if rerr == nil {
 				res.Report = policy.WithNeedsApproval(res.Report, dr.NeedsApproval, dr.ApprovalReasons)
 				res.Report = applyJudgeFloors(res.Report, store.ForRoot(root).Judges, reg)

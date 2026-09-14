@@ -102,18 +102,23 @@ func SaveResult(dir, snapshotID string, res *RunResult) error {
 }
 
 func FindBaseline(resultsDir, baseSnapshotID string) (*RunResult, error) {
-	cands := []string{}
 	if baseSnapshotID != "" {
-		cands = append(cands, filepath.Join(resultsDir, baseSnapshotID+".json"))
-	}
-	cands = append(cands, filepath.Join(resultsDir, "latest.json"))
-	for _, c := range cands {
-		r, err := LoadResult(c)
-		if err == nil {
+		if r, err := LoadResult(filepath.Join(resultsDir, baseSnapshotID+".json")); err == nil {
 			return r, nil
 		}
+		// latest.json is only a match when it is that snapshot. A leftover
+		// result from a different run used to pair as the baseline and
+		// compare the wrong trees.
+		if r, err := LoadResult(filepath.Join(resultsDir, "latest.json")); err == nil && r.SnapshotID == baseSnapshotID {
+			return r, nil
+		}
+		return nil, os.ErrNotExist
 	}
-	return nil, os.ErrNotExist
+	r, err := LoadResult(filepath.Join(resultsDir, "latest.json"))
+	if err != nil {
+		return nil, os.ErrNotExist
+	}
+	return r, nil
 }
 
 // Run executes cases with k samples; early-stops when gated metrics are decisive.

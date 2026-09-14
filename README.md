@@ -47,8 +47,8 @@ Linux, macOS, and Windows, `amd64` and `arm64`.
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/xdlc-labs/airlock/main/install.sh | bash
-# a specific version: AIRLOCK_VERSION=v1.0.0 bash
-# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v1.0.0
+# a specific version: AIRLOCK_VERSION=v1.0.2 bash
+# or: go install github.com/xdlc-labs/airlock/cmd/airlock@v1.0.2
 ```
 
 The script installs the newest stable release. On Windows run it from Git Bash,
@@ -130,8 +130,10 @@ airlock test --mode replay
 ```
 
 Gates fire on confidence intervals, never on a point estimate. A comparative gate
-with no baseline yet reports `SKIPPED` rather than inventing a verdict, and it
-never fails the build on its own.
+with no baseline yet reports `SKIPPED` rather than inventing a verdict. Local
+`airlock test` still PASSes. In CI, `fail_on.inconclusive` (what `airlock init`
+writes) treats SKIPPED like INCONCLUSIVE and blocks the merge. The GitHub Action
+evals the merge-base tree so that gate has a real baseline.
 
 Now the interesting one. Widen an MCP server's permissions instead:
 
