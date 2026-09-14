@@ -7,11 +7,12 @@ import (
 	"github.com/xdlc-labs/airlock/internal/policy"
 )
 
-// A pure comparative gate (only MaxRegressionPP/MaxNewCritical, no Min — the
+// A pure comparative gate (only MaxRegressionPP/MaxNewCritical, no Min, the
 // shape of the default task_success / adversarial_critical gates) with no
 // baseline pairs to compare against used to just vanish from Report.Metrics
-// with zero trace. It must now show up as SKIPPED, and must never fail
-// closed or block the release on its own.
+// with zero trace. It must now show up as SKIPPED, and Evaluate itself must
+// never fail closed on that row. CI fail-closes SKIPPED when
+// fail_on.inconclusive is on (see evalGateErr).
 func TestEvaluateNoBaselineTaskSuccessIsSkippedNotSilent(t *testing.T) {
 	maxReg := 1.0
 	p := policy.Policy{Gates: map[string]policy.GateSpec{

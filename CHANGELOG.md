@@ -13,6 +13,29 @@ Versions follow [SemVer](https://semver.org/) with prerelease tags (`beta`, `rc`
 
 ### Fixed
 
+## [1.0.2] – 2026-09-14
+
+Comparative evals in CI. The Action evals the merge-base tree so
+`task_success` can fire, and a SKIPPED gate fail-closes when
+`fail_on.inconclusive` is on.
+
+Pin `uses: xdlc-labs/airlock@v1` or `@v1.0.2`.
+
+### Highlights
+- GitHub Action evals merge-base via `--base-dir`, so comparative gates get a real baseline.
+- SKIPPED is treated like INCONCLUSIVE in CI when `fail_on.inconclusive` is on.
+- `FindBaseline` only pairs a result that belongs to `--base`.
+
+### Added
+- `airlock ci --base-dir DIR` evals that tree when no result is stored for `--base`, so the GitHub Action can pair merge-base vs head instead of skipping comparative gates.
+
+### Changed
+- `fail_on.inconclusive` (and `--fail-on-inconclusive`) treats a SKIPPED comparative gate as inconclusive and fails the CI run. `policy.Evaluate` still leaves SKIPPED out of Overall, so local `airlock test` without a baseline still PASSes.
+
+### Fixed
+- `FindBaseline` no longer pairs `latest.json` when that file is a different snapshot than `--base`.
+- The Action passes `--base-dir` at the merge-base worktree so `task_success` / `adversarial_critical` can actually fire.
+
 ## [1.0.0] – 2026-09-10
 
 First stable release. The CLI, the `.airlock/` layout, and the Action inputs
@@ -300,7 +323,8 @@ Install from this tag (not beta.1). One pin lives in [README — Install](README
 - Approvals are advisory unless CI passes `--fail-on-approval`
 - Windows install not supported yet
 
-[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/xdlc-labs/airlock/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/xdlc-labs/airlock/compare/v1.0.0...v1.0.2
 [1.0.0]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.15...v1.0.0
 [0.1.0-beta.15]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.14...v0.1.0-beta.15
 [0.1.0-beta.14]: https://github.com/xdlc-labs/airlock/compare/v0.1.0-beta.13...v0.1.0-beta.14
